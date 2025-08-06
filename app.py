@@ -3,10 +3,16 @@ from flask import Flask, jsonify, request
 import psycopg2
 from psycopg2.extras import DictCursor
 from dotenv import load_dotenv
+from datetime import date
+from flask_socketio import SocketIO, emit
+from flask_cors import CORS
 
 load_dotenv()
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*", )
+CORS(app)
+
 
 def get_db_connection():
     conn = psycopg2.connect(
@@ -31,10 +37,12 @@ def _get_proximo_numero_pedido():
         cur.execute("SELECT numero_pedido FROM pedidos WHERE reset_data = %s ORDER BY numero_pedido DESC LIMIT 1 FOR UPDATE;", (data_reset,))
         ultimo_numero = cur.fetchone()
         
-        if ultimo_numero and ultimo_numero[0] < 99:
+        if ultimo_numero:
             proximo_numero = ultimo_numero[0] + 1
         else:
             proximo_numero = 1
+        if proximo_numero%100 == 0:
+            proximo_numero += 1
 
     finally:
         cur.close()
@@ -42,9 +50,9 @@ def _get_proximo_numero_pedido():
 
     return proximo_numero
 
-
 @app.route('/')
 def home():
+    socketio.emit('my_response', {'data': 'Hello, World!'})
     return "Servidor Rodando!"
 
 @app.route('/produtos', methods=['GET'])
@@ -138,7 +146,15 @@ def criar_pedido():
             INSERT INTO pedidos (numero_pedido, observacoes, total_pedido)
             VALUES (%s, %s, %s) RETURNING id;
         """, (proximo_numero, observacoes_pedido, 0.00))
-        pedido_id = cur.fetchone()['id']
+        pedido_dados = cur.fetchone()
+        pedido_id = pedido_dados['id']
+        
+        novo_pedido_detalhes = {
+            'pedido_id': pedido_id,
+            'numero_pedido': proximo_numero,
+            'observacoes': observacoes_pedido,
+            'itens': []
+        }
 
         total_pedido = 0.00
         
@@ -180,24 +196,47 @@ def criar_pedido():
             # Inserir item do pedido
             cur.execute("""
                 INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco_unitario, subtotal, observacoes_item)
-                VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;
+                VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, status_item;
             """, (pedido_id, produto_id, quantidade_item, preco_final_item, subtotal_item, observacoes_item))
-            item_pedido_id = cur.fetchone()['id']
+            
+            item_info = cur.fetchone()
+            print(item_info)
+            item_pedido_id = item_info['id']
+            status_item = item_info['status_item']
 
+            item_para_ws = {
+                'item_id': item_pedido_id,
+                'produto_nome': produto_nome,
+                'produto_tipo': tipo_produto,
+                'quantidade': quantidade_item,
+                'status_item': status_item,
+                'observacoes_item': observacoes_item,
+                'ingredientes': [] # Inicializa a lista de ingredientes
+            }
+            
             # Se for um pastel customizado, inserir os ingredientes
             if tipo_produto == 'pastel':
                 for ingrediente_data in ingredientes_adicionais:
                     cur.execute("SELECT id FROM produtos WHERE nome = %s;", (ingrediente_data['nome'],))
-                    ingrediente_id = cur.fetchone()['id']
+                    ingrediente_info = cur.fetchone()
+                    ingrediente_id = ingrediente_info['id']
+                    
                     cur.execute("""
                         INSERT INTO past_ingredientes (item_pedido_id, ingrediente_id, quantidade)
                         VALUES (%s, %s, %s);
                     """, (item_pedido_id, ingrediente_id, ingrediente_data.get('quantidade', 1)))
+                    
+                    item_para_ws['ingredientes'].append(ingrediente_data['nome'])
+
+            novo_pedido_detalhes['itens'].append(item_para_ws)
 
         # 5. Atualizar o total_pedido no registro principal
         cur.execute("UPDATE pedidos SET total_pedido = %s WHERE id = %s;", (total_pedido, pedido_id))
+        novo_pedido_detalhes['total_pedido'] = total_pedido
 
         conn.commit() # Confirma todas as inserções
+        
+        socketio.emit('novo_pedido', novo_pedido_detalhes)
         
     except Exception as e:
         conn.rollback() # Reverte todas as inserções em caso de erro
@@ -208,7 +247,124 @@ def criar_pedido():
 
     return jsonify({"mensagem": "Pedido criado com sucesso.", "numero_pedido": proximo_numero, "total_pedido": total_pedido}), 201
 
+@app.route('/pedidos/itens', methods=['GET'])
+def get_itens_pedido():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
+    
+    # Parâmetros de filtro da URL
+    status_filtro = request.args.get('status_item')
+    
+    # Lógica para construir a query SQL com base no filtro
+    query = """
+        SELECT
+            ip.id AS item_id,
+            ip.pedido_id,
+            ip.quantidade,
+            ip.observacoes_item,
+            ip.status_item,
+            p.nome AS produto_nome,
+            p.tipo AS produto_tipo,
+            pe.numero_pedido
+        FROM itens_pedido ip
+        JOIN produtos p ON ip.produto_id = p.id
+        JOIN pedidos pe ON ip.pedido_id = pe.id
+    """
+    
+    if status_filtro:
+        query += " WHERE ip.status_item = %s"
+        params = (status_filtro,)
+    else:
+        params = ()
+        
+    query += " ORDER BY pe.data_hora_pedido, ip.id;"
+    
+    try:
+        cur.execute(query, params)
+        itens = cur.fetchall()
+        
+        lista_final = []
+        for item in itens:
+            item_dict = dict(item)
+            
+            if item_dict['produto_tipo'] == 'pastel':
+                cur_ingredientes = conn.cursor(cursor_factory=DictCursor)
+                cur_ingredientes.execute("""
+                    SELECT p.nome AS ingrediente_nome
+                    FROM past_ingredientes pi
+                    JOIN produtos p ON pi.ingrediente_id = p.id
+                    WHERE pi.item_pedido_id = %s;
+                """, (item_dict['item_id'],))
+                
+                ingredientes = cur_ingredientes.fetchall()
+                item_dict['ingredientes'] = [i['ingrediente_nome'] for i in ingredientes]
+                cur_ingredientes.close()
+            else:
+                item_dict['ingredientes'] = [] # Garante que a chave 'ingredientes' exista
+
+            lista_final.append(item_dict)
+
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+    
+    return jsonify(lista_final)
+
+STATUS_POSSIVEIS = ['aguardando', 'em_preparacao', 'pronto', 'entregue', 'cancelado']
+
+@app.route('/itens-pedido/<int:item_id>/status', methods=['PUT'])
+def atualizar_status_item(item_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    data = request.get_json()
+    novo_status = data.get('status')
+
+    if not novo_status:
+        return jsonify({"erro": "O novo status não foi fornecido."}), 400
+
+    if novo_status not in STATUS_POSSIVEIS:
+        return jsonify({"erro": "Status inválido."}), 400
+
+    try:
+        # 1. Atualiza o status do item no banco de dados
+        cur.execute("""
+            UPDATE itens_pedido
+            SET status_item = %s
+            WHERE id = %s RETURNING pedido_id;
+        """, (novo_status, item_id))
+        
+        resultado = cur.fetchone()
+        
+        if not resultado:
+            conn.rollback()
+            return jsonify({"erro": "Item do pedido não encontrado."}), 404
+        
+        pedido_id = resultado[0]
+
+        conn.commit()
+
+        # 2. Emite o evento de WebSocket para notificar os clientes
+        socketio.emit('status_atualizado', {
+            'item_id': item_id,
+            'pedido_id': pedido_id,
+            'novo_status': novo_status
+        },
+            namespace='teste')
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+    # 3. Retorna a resposta HTTP de sucesso para o cliente que fez a requisição
+    return jsonify({
+        "mensagem": f"Status do item {item_id} atualizado para '{novo_status}'.",
+        "pedido_id": pedido_id
+    }), 200
 
 if __name__ == '__main__':
-    print(_get_proximo_numero_pedido())
-    # app.run(host='0.0.0.0', port=5000, debug=True)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
