@@ -348,10 +348,9 @@ def atualizar_status_item(item_id):
         # 2. Emite o evento de WebSocket para notificar os clientes
         socketio.emit('status_atualizado', {
             'item_id': item_id,
-            'pedido_id': pedido_id,
-            'novo_status': novo_status
-        },
-            namespace='teste')
+            'novo_status': novo_status,
+            'pedido_id': pedido_id
+        })
 
     except Exception as e:
         conn.rollback()

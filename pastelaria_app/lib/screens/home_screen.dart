@@ -58,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Pedido #${item.pedidoId} - Produto: ${item.produtoNome}',
+              'Pedido #${item.id} - Produto: ${item.produtoNome}',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),

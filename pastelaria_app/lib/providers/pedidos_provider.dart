@@ -9,7 +9,7 @@ class PedidosProvider with ChangeNotifier {
   final IO.Socket _socket;
 
   List<ItemPedido> _itensPedido = [];
-  String _statusFiltroAtual = 'aguardando';
+  final String _statusFiltroAtual = 'aguardando';
 
   List<ItemPedido> get itensPedido => _itensPedido;
 
@@ -17,10 +17,9 @@ class PedidosProvider with ChangeNotifier {
     _initWebSocket();
   }
 
-  // 1. Inicializa o WebSocket e configura os listeners
   void _initWebSocket() {
     _socket.connect();
-
+    
     _socket.onConnect((_) {
       print('Conectado ao WebSocket!');
     });
@@ -29,18 +28,32 @@ class PedidosProvider with ChangeNotifier {
       print('Desconectado do WebSocket!');
     });
 
-    // Ouve o evento 'status_atualizado'
     _socket.on('status_atualizado', (data) {
-      final itemId = data['item_id'];
-      final novoStatus = data['novo_status'];
-
+      print('Status de item atualizado recebido via WebSocket: $data');
+      final int itemId = data['item_id'];
+      final String novoStatus = data['novo_status'];
       _updateItemStatusLocal(itemId, novoStatus);
     });
 
-    // Ouve o evento 'novo_pedido'
+    // 1. CORREÇÃO: Ouve o evento 'novo_pedido'
     _socket.on('novo_pedido', (data) {
-      final novoItem = ItemPedido.fromJson(data);
-      _addNewItemLocal(novoItem);
+      print('Novo pedido recebido via WebSocket: $data');
+
+      // 2. Extrai a lista de itens do JSON principal
+      final List itensData = data['itens'];
+      
+      // 3. Itera sobre cada item na lista e o adiciona
+      for (var itemJson in itensData) {
+        // Usa o ItemPedido.fromJson no JSON de um item individual
+        final novoItem = ItemPedido.fromJson(itemJson);
+
+        // Adiciona o item à lista apenas se ele corresponder ao filtro
+        if (novoItem.statusItem == _statusFiltroAtual) {
+          _itensPedido.add(novoItem);
+        }
+      }
+
+      notifyListeners(); // Notifica a UI após todos os itens serem adicionados
     });
   }
 
@@ -70,7 +83,6 @@ class PedidosProvider with ChangeNotifier {
     if (index != -1) {
       _itensPedido[index] = ItemPedido(
         id: _itensPedido[index].id,
-        pedidoId: _itensPedido[index].pedidoId,
         quantidade: _itensPedido[index].quantidade,
         produtoNome: _itensPedido[index].produtoNome,
         statusItem: novoStatus, // Atualiza o status
