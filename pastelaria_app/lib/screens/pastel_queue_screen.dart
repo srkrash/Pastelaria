@@ -13,16 +13,19 @@ class PastelQueueScreen extends StatefulWidget {
 }
 
 class _PastelQueueScreenState extends State<PastelQueueScreen> {
-  final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
   final FocusNode _focusNode = FocusNode();
+  final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
 
-  @override
-  void initState() {
+@override
+void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await Provider.of<PedidosProvider>(context, listen: false).prepareFilaPastel();
-      // Anima a entrada dos itens iniciais
       final pedidosProvider = Provider.of<PedidosProvider>(context, listen: false);
+      pedidosProvider.setListKey(_listKey);
+      await pedidosProvider.prepareFilaPastel();
+
+      // ESTA É A FUNÇÃO QUE FALTAVA PARA EXIBIR OS CARDS INICIAIS
+      // Anima a entrada de cada item na lista, um por um
       for(int i = 0; i < pedidosProvider.filaPastel.length; i++) {
         _listKey.currentState?.insertItem(i, duration: const Duration(milliseconds: 500));
       }
@@ -37,8 +40,9 @@ class _PastelQueueScreenState extends State<PastelQueueScreen> {
 
   void _handleKey(KeyEvent event) {
     if (event is KeyDownEvent) {
-      if (event.logicalKey == LogicalKeyboardKey.keyL) {
-        Provider.of<PedidosProvider>(context, listen: false).avancarFila(_listKey);
+      if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+        // Agora, o método avancarFila não precisa mais receber a chave
+        Provider.of<PedidosProvider>(context, listen: false).avancarFila();
       }
     }
   }
@@ -67,11 +71,11 @@ class _PastelQueueScreenState extends State<PastelQueueScreen> {
                   scrollDirection: Axis.horizontal,
                   itemBuilder: (context, index, animation) {
                     final item = pedidosProvider.filaPastel[index];
-                    return SizeTransition( // Anima a entrada do item
+                    return SizeTransition(
                       sizeFactor: animation,
                       axis: Axis.horizontal,
                       child: SizedBox(
-                        width: MediaQuery.of(context).size.width / 4, // Exibe 4 cards na tela
+                        width: MediaQuery.of(context).size.width / 4,
                         child: _buildPastelCard(item),
                       ),
                     );
@@ -96,13 +100,14 @@ class _PastelQueueScreenState extends State<PastelQueueScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                'Pedido #${item.id}',
+                'Item #${item.id}',
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
               Text(
-                'Ingredientes: ${item.ingredientes.join(', ')}',
+                'Ingredientes: \n${item.ingredientes.join('\n')}',
                 textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
             ],
           ),

@@ -6,21 +6,31 @@ import '../services/api_service.dart';
 
 class PedidosProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
-  final IO.Socket _socket;
+  late final IO.Socket _socket;
 
   List<ItemPedido> _itensPedido = [];
   List<ItemPedido> _filaPastel = [];
 
-  List<ItemPedido> get itensPedido => _itensPedido;
-   List<ItemPedido> get filaPastel => _filaPastel;
+  List<ItemPedido> get filaPastel => _filaPastel;
 
-  PedidosProvider() : _socket = IO.io('http://localhost:5000', IO.OptionBuilder().setTransports(['websocket']).enableAutoConnect().build()) {
+  // A CHAVE GLOBAL AGORA ESTÁ NO PROVEDOR
+  GlobalKey<AnimatedListState>? _listKey;
+
+  void setListKey(GlobalKey<AnimatedListState> key) {
+    _listKey = key;
+  }
+
+  PedidosProvider()
+      : _socket = IO.io('http://localhost:5000', <String, dynamic>{
+          'transports': <String>['websocket'],
+          'autoConnect': false,
+        }) {
     _initWebSocket();
   }
 
   void _initWebSocket() {
     _socket.connect();
-    
+
     _socket.onConnect((_) {
       print('Conectado ao WebSocket!');
     });
@@ -29,61 +39,43 @@ class PedidosProvider with ChangeNotifier {
       print('Desconectado do WebSocket!');
     });
 
-    _socket.on('novo_pedido', (data) {
-      print('Novo pedido recebido via WebSocket: $data');
-      final List<dynamic> itensJson = data['itens'];
-      for (var itemJson in itensJson) {
-        // Verifica se é um pastel e adiciona à fila, destrinchando
-        if (itemJson['produto_tipo'] == 'pastel') {
-          for (int i = 0; i < itemJson['quantidade']; i++) {
-            _filaPastel.add(ItemPedido.fromJson(itemJson));
-          }
+  _socket.on('novo_pedido', (data) {
+    print('Novo pedido recebido via WebSocket: $data');
+    final List<dynamic> itensJson = data['itens'];
+    for (var itemJson in itensJson) {
+      if (itemJson['produto_tipo'] == 'pastel') {
+        for (int i = 0; i < itemJson['quantidade']; i++) {
+          // 1. OBTÉM O ÍNDICE CORRETO ANTES DE ADICIONAR O ITEM
+          final int newIndex = _filaPastel.length;
+          
+          // 2. ADICIONA O ITEM NA LISTA
+          final novoItem = ItemPedido.fromJson(itemJson);
+          _filaPastel.add(novoItem);
+          
+          // 3. ANIMA A ADIÇÃO USANDO O ÍNDICE CORRETO
+          _listKey?.currentState?.insertItem(newIndex, duration: const Duration(milliseconds: 500));
         }
       }
-      notifyListeners();
-    });
-
-    // Lógica para atualizar o status em tempo real
-    _socket.on('status_atualizado', (data) {
-      print('Status de item atualizado recebido via WebSocket: $data');
-      final int itemId = data['item_id'];
-      final String novoStatus = data['novo_status'];
-      _updateItemStatusLocal(itemId, novoStatus);
-    });
-  }
-
-  void _updateItemStatusLocal(int itemId, String novoStatus) {
-  // Encontra o índice do item na lista 'itensPedido'
-  final itemIndex = _itensPedido.indexWhere((item) => item.id == itemId);
-  
-  if (itemIndex != -1) { // Verifica se o item foi encontrado
-    // Pega o item atual
-    final itemAtual = _itensPedido[itemIndex];
-    
-    // Cria uma nova instância do item com o status atualizado
-    final itemAtualizado = ItemPedido(
-      id: itemAtual.id,
-      quantidade: itemAtual.quantidade,
-      produtoNome: itemAtual.produtoNome,
-      statusItem: novoStatus, // Atualiza o status
-      ingredientes: itemAtual.ingredientes,
-      observacoesItem: itemAtual.observacoesItem,
-    );
-    
-    // Substitui o item antigo pelo novo na lista
-    _itensPedido[itemIndex] = itemAtualizado;
-
-    // Notifica os widgets que a lista mudou
+    }
+    // A chamada notifyListeners é importante para que o estado seja atualizado.
     notifyListeners();
-  }
+  });
+
+  _socket.on('status_atualizado', (data) {
+    print('Status de item atualizado recebido via WebSocket: $data');
+    final int itemId = data['item_id'];
+    final String novoStatus = data['novo_status'];
+    _updateItemStatusLocal(itemId, novoStatus);
+  });
 }
 
   // 2. Busca inicial dos itens de pedido
-   Future<void> prepareFilaPastel() async {
+  Future<void> prepareFilaPastel() async {
     try {
       // Busca itens com status 'aguardando' OU 'em_producao'
-      _itensPedido = await _apiService.getItensPorStatus(['aguardando', 'em_producao']);
-      
+      _itensPedido =
+          await _apiService.getItensPorStatus(['aguardando', 'em_producao']);
+
       List<ItemPedido> itensPastel = [];
       for (var item in _itensPedido) {
         if (item.produtoNome == 'Pastel') {
@@ -106,7 +98,31 @@ class PedidosProvider with ChangeNotifier {
     }
   }
 
-  Future<void> _atualizarStatusDeTodosItens(int itemId, String novoStatus) async {
+  Future<void> avancarFila() async {
+    if (_filaPastel.isNotEmpty) {
+      final itemPronto = _filaPastel.removeAt(0);
+
+      _listKey?.currentState?.removeItem(
+        0,
+        (context, animation) => _buildRemovedItem(itemPronto, animation),
+        duration: const Duration(milliseconds: 500),
+      );
+
+      await _atualizarStatusDeTodosItens(itemPronto.id, 'pronto');
+
+      if (_filaPastel.isNotEmpty) {
+        final primeiroItem = _filaPastel.first;
+        if (primeiroItem.statusItem == 'aguardando') {
+          await _atualizarStatusDeTodosItens(primeiroItem.id, 'em_preparacao');
+        }
+      }
+      // A chamada notifyListeners aqui é fundamental para que o estado do item seja atualizado
+      notifyListeners();
+    }
+  }
+
+  Future<void> _atualizarStatusDeTodosItens(
+      int itemId, String novoStatus) async {
     // Primeiro, atualiza o status no backend
     await _apiService.atualizarStatusItem(itemId, novoStatus);
 
@@ -126,44 +142,38 @@ class PedidosProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Novo método para avançar a fila e atualizar o status
-  Future<void> avancarFila(GlobalKey<AnimatedListState> listKey) async {
-    if (_filaPastel.isNotEmpty) {
-      final itemPronto = _filaPastel.removeAt(0);
-
-      // Remove o item da lista com uma animação
-      listKey.currentState?.removeItem(
-        0, // Índice do item a ser removido
-        (context, animation) => _buildRemovedItem(itemPronto, animation),
-        duration: const Duration(milliseconds: 500),
-      );
-
-      // Atualiza o status do item removido para 'pronto'
-      await _atualizarStatusDeTodosItens(itemPronto.id, 'pronto');
-
-      // Adiciona um novo item na fila (se houver) de forma animada
-      // A lógica para adicionar um novo item pode ser mais complexa
-      // e depende de como novos itens chegam. Por enquanto, a fila
-      // apenas se move, e o espaço é preenchido com o próximo item.
-      
-      // Atualiza o status do primeiro item visível para 'em_preparacao'
-      if (_filaPastel.isNotEmpty) {
-        final primeiroItem = _filaPastel.first;
-        if (primeiroItem.statusItem == 'aguardando') {
-          await _atualizarStatusDeTodosItens(primeiroItem.id, 'em_preparacao');
-        }
-      }
-      notifyListeners();
-    }
-  }
   Widget _buildRemovedItem(ItemPedido item, Animation<double> animation) {
     return SizeTransition(
       sizeFactor: animation,
       axis: Axis.horizontal,
       child: Card(
-        // ... (código do card, pode ser extraído para um método) ...
-        child: Text('Removendo: ${item.produtoNome}'),
+        margin: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text('Removendo: Item #${item.id}',
+              style: const TextStyle(fontSize: 16, color: Colors.red)),
+        ),
       ),
     );
+  }
+
+  void _updateItemStatusLocal(int itemId, String novoStatus) {
+    bool updated = false;
+    for (int i = 0; i < _filaPastel.length; i++) {
+      if (_filaPastel[i].id == itemId) {
+        _filaPastel[i] = ItemPedido(
+          id: _filaPastel[i].id,
+          quantidade: _filaPastel[i].quantidade,
+          produtoNome: _filaPastel[i].produtoNome,
+          statusItem: novoStatus,
+          ingredientes: _filaPastel[i].ingredientes,
+          observacoesItem: _filaPastel[i].observacoesItem,
+        );
+        updated = true;
+      }
+    }
+    if (updated) {
+      notifyListeners();
+    }
   }
 }
