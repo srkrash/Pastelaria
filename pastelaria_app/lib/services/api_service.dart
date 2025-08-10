@@ -8,14 +8,22 @@ const String baseUrl = 'http://localhost:5000';
 
 class ApiService {
   // Método para obter itens de pedido com filtro de status
-  Future<List<ItemPedido>> getItensPorStatus(String status) async {
-    final response = await http.get(Uri.parse('$baseUrl/pedidos/itens?status_item=$status'));
+  Future<List<ItemPedido>> getItensPorStatus(List<String> statuses) async {
+    try {
+      final statusQuery = statuses.map((s) => 'status_item=$s').join('&');
+      final uri = Uri.parse('$baseUrl/pedidos/itens?$statusQuery');
 
-    if (response.statusCode == 200) {
-      List jsonResponse = jsonDecode(response.body);
-      return jsonResponse.map((item) => ItemPedido.fromJson(item)).toList();
-    } else {
-      throw Exception('Falha ao carregar itens do pedido');
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        List<dynamic> itensJson = json.decode(response.body);
+        return itensJson.map((json) => ItemPedido.fromJson(json)).toList();
+      } else {
+        throw Exception(
+            'Falha ao buscar itens com status: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erro ao buscar itens: $e');
     }
   }
 
