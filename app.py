@@ -30,7 +30,7 @@ def _get_proximo_numero_pedido():
     
     # Usa o fuso horário correto para a data de reset
     cur.execute("SELECT (NOW() AT TIME ZONE 'America/Sao_Paulo')::DATE;")
-    data_reset = cur.fetchone()[0]
+    data_reset = cur.fetchone()[0] # type: ignore
 
     try:
         # Usa SELECT FOR UPDATE para evitar que dois clientes peguem o mesmo número
@@ -147,7 +147,7 @@ def criar_pedido():
             VALUES (%s, %s, %s) RETURNING id;
         """, (proximo_numero, observacoes_pedido, 0.00))
         pedido_dados = cur.fetchone()
-        pedido_id = pedido_dados['id']
+        pedido_id = pedido_dados['id'] # type: ignore
         
         novo_pedido_detalhes = {
             'pedido_id': pedido_id,
@@ -163,7 +163,7 @@ def criar_pedido():
             produto_nome = item_data['produto_nome']
             quantidade_item = item_data.get('quantidade', 1)
             observacoes_item = item_data.get('observacoes_item', '')
-            ingredientes_adicionais = item_data.get('ingredientes_adicionais', [])
+            ingredientes = item_data.get('ingredientes', [])
 
             # Obter dados do produto
             cur.execute("SELECT id, preco, tipo FROM produtos WHERE nome = %s;", (produto_nome,))
@@ -181,7 +181,7 @@ def criar_pedido():
             # Lógica de precificação para pastéis customizados
             if tipo_produto == 'pastel':
                 ingredientes_pagos = [
-                    ing for ing in ingredientes_adicionais
+                    ing for ing in ingredientes
                     if ing['nome'].lower() not in ['cebola', 'cebolinha', 'orégano']
                 ]
                 num_ingredientes = len(ingredientes_pagos)
@@ -201,8 +201,8 @@ def criar_pedido():
             
             item_info = cur.fetchone()
             print(item_info)
-            item_pedido_id = item_info['id']
-            status_item = item_info['status_item']
+            item_pedido_id = item_info['id'] # type: ignore
+            status_item = item_info['status_item'] # type: ignore
 
             item_para_ws = {
                 'item_id': item_pedido_id,
@@ -216,10 +216,10 @@ def criar_pedido():
             
             # Se for um pastel customizado, inserir os ingredientes
             if tipo_produto == 'pastel':
-                for ingrediente_data in ingredientes_adicionais:
+                for ingrediente_data in ingredientes:
                     cur.execute("SELECT id FROM produtos WHERE nome = %s;", (ingrediente_data['nome'],))
                     ingrediente_info = cur.fetchone()
-                    ingrediente_id = ingrediente_info['id']
+                    ingrediente_id = ingrediente_info['id'] # type: ignore
                     
                     cur.execute("""
                         INSERT INTO past_ingredientes (item_pedido_id, ingrediente_id, quantidade)
@@ -242,7 +242,7 @@ def criar_pedido():
         conn.rollback() # Reverte todas as inserções em caso de erro
         return jsonify({"erro": str(e)}), 500
     finally:
-        cur.close()
+        cur.close() # type: ignore
         conn.close()
 
     return jsonify({"mensagem": "Pedido criado com sucesso.", "numero_pedido": proximo_numero, "total_pedido": total_pedido}), 201

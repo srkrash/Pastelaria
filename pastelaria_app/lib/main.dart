@@ -1,16 +1,11 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:pastelaria_app/screens/main_screen.dart'; // Importe a nova tela
 import 'providers/pedidos_provider.dart';
-import 'screens/home_screen.dart';
 
 void main() {
-  runApp(
-    ChangeNotifierProvider(
-      create: (context) => PedidosProvider(),
-      child: const MyApp(),
-    ),
-  );
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -18,12 +13,18 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Pastelaria App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => PedidosProvider()),
+      ],
+      child: MaterialApp(
+        title: 'Pastelaria App',
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+          visualDensity: VisualDensity.adaptivePlatformDensity,
+        ),
+        home: const MainScreen(), // Defina MainScreen como a tela inicial
       ),
-      home: const HomeScreen(),
     );
   }
 }

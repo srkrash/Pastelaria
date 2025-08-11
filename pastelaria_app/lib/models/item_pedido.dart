@@ -1,5 +1,4 @@
 // lib/models/item_pedido.dart
-import 'dart:convert';
 
 class ItemPedido {
   final int id;

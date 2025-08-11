@@ -62,6 +62,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_keyboard_listener:
+    dependency: "direct main"
+    description:
+      name: flutter_keyboard_listener
+      sha256: "056560b99103c2c8bf8c56da3880ad3c5c66adb67c4ea941c89e5a1d6a581ad2"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.1"
   flutter_lints:
     dependency: "direct dev"
     description:
