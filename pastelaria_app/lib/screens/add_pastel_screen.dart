@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum PastelType { none, pizza, misto }
+enum PastelType { none, Pizza, Misto }
 
 class AddPastelScreen extends StatefulWidget {
   const AddPastelScreen({super.key});
@@ -20,6 +20,8 @@ class _AddPastelScreenState extends State<AddPastelScreen> {
 
   int _quantidade = 1;
   PastelType _selectedPastelType = PastelType.none;
+  // NOVO: Controlador para o campo de observações
+  final TextEditingController _observacoesController = TextEditingController();
 
   void _aumentarQuantidade() {
     setState(() { _quantidade++; });
@@ -29,6 +31,13 @@ class _AddPastelScreenState extends State<AddPastelScreen> {
     if (_quantidade > 1) {
       setState(() { _quantidade--; });
     }
+  }
+
+  // NOVO: Método para descartar o controlador quando a tela for fechada
+  @override
+  void dispose() {
+    _observacoesController.dispose();
+    super.dispose();
   }
 
   @override
@@ -55,7 +64,6 @@ class _AddPastelScreenState extends State<AddPastelScreen> {
             ),
             const SizedBox(height: 24.0),
             
-            // Removemos o Expanded daqui para que esta seção ocupe apenas o espaço que precisa.
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -71,15 +79,26 @@ class _AddPastelScreenState extends State<AddPastelScreen> {
             
             Row(
               children: [
-                _buildSpecialPastelButton('Pastel Pizza', PastelType.pizza),
+                _buildSpecialPastelButton('Pastel Pizza', PastelType.Pizza),
                 const SizedBox(width: 16.0),
-                _buildSpecialPastelButton('Pastel Misto', PastelType.misto),
+                _buildSpecialPastelButton('Pastel Misto', PastelType.Misto),
               ],
             ),
             
             const Divider(thickness: 2),
             
-            // Este Expanded agora pegará todo o espaço restante.
+            // NOVO: Campo de observação
+            TextField(
+              controller: _observacoesController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Observações (Ex: Sem cebola, bem passado)',
+              ),
+              maxLines: null, // Permite múltiplas linhas
+              keyboardType: TextInputType.multiline,
+            ),
+
+            // Este Expanded agora pegará o espaço restante.
             Expanded(
               child: Container(),
             ),
@@ -97,18 +116,20 @@ class _AddPastelScreenState extends State<AddPastelScreen> {
                 ElevatedButton(
                   onPressed: () {
                     final List<String> ingredientes;
-                    if (_selectedPastelType == PastelType.pizza) {
-                      ingredientes = ['Queijo', 'Tomate', 'Calabresa', 'Azeitona', 'Orégano'];
-                    } else if (_selectedPastelType == PastelType.misto) {
-                      ingredientes = ['Queijo', 'Presunto', 'Tomate', 'Orégano'];
+                    if (_selectedPastelType == PastelType.Pizza) {
+                      ingredientes = ['Pizza'];
+                    } else if (_selectedPastelType == PastelType.Misto) {
+                      ingredientes = ['Misto'];
                     } else {
                       ingredientes = _ingredientesSelecionados.keys.where((key) => _ingredientesSelecionados[key] == true).toList();
                     }
 
+                    // NOVO: Adiciona a observação ao mapa de resultado
                     final resultado = {
                       'quantidade': _quantidade,
                       'ingredientes': ingredientes,
-                      'tipo_pastel': _selectedPastelType.name,
+                      'tipo_pastel': 'none',
+                      'observacoesItem': _observacoesController.text,
                     };
                     Navigator.of(context).pop(resultado);
                   },
@@ -179,11 +200,11 @@ class _AddPastelScreenState extends State<AddPastelScreen> {
           });
         },
         style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                backgroundColor: isSelected ? const Color.fromARGB(255, 105, 226, 109) : null,
-                padding: const EdgeInsets.symmetric(vertical: 35.0),
-                textStyle: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          backgroundColor: isSelected ? const Color.fromARGB(255, 105, 226, 109) : null,
+          padding: const EdgeInsets.symmetric(vertical: 35.0),
+          textStyle: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
         child: Text(text),
       ),
     );

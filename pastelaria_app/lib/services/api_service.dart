@@ -39,4 +39,49 @@ class ApiService {
       throw Exception('Falha ao atualizar o status do item');
     }
   }
+
+  Future<Map<String, dynamic>> inserirPedido(String endpoint, Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/$endpoint'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: jsonEncode(data),
+    );
+
+    if (response.statusCode == 201) { // 201 Created
+      return json.decode(response.body);
+    } else {
+      throw Exception('Falha ao enviar dados para o endpoint: $endpoint. Status: ${response.statusCode}');
+    }
+  }
+
+  Future<List<dynamic>> getProdutos({String? tipo}) async {
+
+    try {
+      String endpoint = 'produtos';
+      // Se um tipo for fornecido, adiciona-o como um parâmetro de consulta.
+      if (tipo != null && tipo.isNotEmpty) {
+        endpoint = '$endpoint?tipo=$tipo';
+      }
+
+      final url = Uri.parse('$baseUrl/$endpoint');
+
+      // Faz a requisição GET.
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        // Decodifica o corpo da resposta JSON para uma lista dinâmica.
+        return jsonDecode(response.body);
+      } else {
+        // Lança uma exceção se a requisição falhar.
+        throw Exception(
+            'Falha ao carregar produtos: Status Code ${response.statusCode}');
+      }
+    } catch (e) {
+      // Captura e lança exceções de rede ou outras.
+      print('Erro ao buscar produtos: $e');
+      rethrow;
+    }
+  }
 }

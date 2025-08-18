@@ -28,6 +28,26 @@ class PedidosProvider with ChangeNotifier {
     _initWebSocket();
   }
 
+  // Lista de itens do pedido atual
+  final List<ItemPedido> _itensPedidoAtual = [];
+
+  List<ItemPedido> get itensPedidoAtual => _itensPedidoAtual;
+
+  void adicionarItem(ItemPedido item) {
+    _itensPedidoAtual.add(item);
+    notifyListeners();
+  }
+
+  void removerItem(ItemPedido item) {
+    _itensPedidoAtual.remove(item);
+    notifyListeners();
+  }
+
+  void limparPedido() {
+    _itensPedidoAtual.clear();
+    notifyListeners();
+  }
+
   void _initWebSocket() {
     _socket.connect();
 
@@ -43,7 +63,7 @@ class PedidosProvider with ChangeNotifier {
     print('Novo pedido recebido via WebSocket: $data');
     final List<dynamic> itensJson = data['itens'];
     for (var itemJson in itensJson) {
-      if (itemJson['produto_tipo'] == 'pastel') {
+      if (itemJson['produto_tipo'] == 'pastel'){
         for (int i = 0; i < itemJson['quantidade']; i++) {
           // 1. OBTÉM O ÍNDICE CORRETO ANTES DE ADICIONAR O ITEM
           final int newIndex = _filaPastel.length;
@@ -70,33 +90,48 @@ class PedidosProvider with ChangeNotifier {
 }
 
   // 2. Busca inicial dos itens de pedido
-  Future<void> prepareFilaPastel() async {
-    try {
-      // Busca itens com status 'aguardando' OU 'em_producao'
-      _itensPedido =
-          await _apiService.getItensPorStatus(['aguardando', 'em_producao']);
+Future<void> prepareFilaPastel() async {
+  try {
+    // Busca itens com status 'aguardando' OU 'em_producao'
+    _itensPedido =
+        await _apiService.getItensPorStatus(['aguardando', 'em_producao']);
 
-      List<ItemPedido> itensPastel = [];
-      for (var item in _itensPedido) {
-        if (item.produtoNome == 'Pastel') {
-          for (int i = 0; i < item.quantidade; i++) {
-            // Cria um novo item para cada unidade, copiando os dados
-            itensPastel.add(ItemPedido(
-              id: item.id,
-              quantidade: 1, // Fixa a quantidade em 1
-              produtoNome: item.produtoNome,
-              statusItem: item.statusItem,
-              ingredientes: item.ingredientes,
-            ));
-          }
+    List<ItemPedido> itensPastel = [];
+    for (var item in _itensPedido) {
+      // Condição atualizada para incluir todos os tipos de pastéis
+      if (item.produtoNome == 'Pastel') {
+        for (int i = 0; i < item.quantidade; i++) {
+          // Cria um novo item para cada unidade, copiando os dados
+          itensPastel.add(ItemPedido(
+            id: item.id,
+            quantidade: 1, // Fixa a quantidade em 1
+            produtoNome: item.produtoNome,
+            statusItem: item.statusItem,
+            ingredientes: item.ingredientes,
+            observacoesItem: item.observacoesItem, // Adicione este campo para que a observação também seja copiada
+          ));
         }
       }
-      _filaPastel = itensPastel;
-      notifyListeners();
-    } catch (e) {
-      print('Erro ao preparar a fila de pastéis: $e');
+      else if (item.produtoNome == 'Pizza' || item.produtoNome == 'Misto') {
+        for (int i = 0; i < item.quantidade; i++) {
+          // Cria um novo item para cada unidade, copiando os dados
+          itensPastel.add(ItemPedido(
+            id: item.id,
+            quantidade: 1, // Fixa a quantidade em 1
+            produtoNome: item.produtoNome,
+            statusItem: item.statusItem,
+            ingredientes: [item.produtoNome],
+            observacoesItem: item.observacoesItem, // Adicione este campo para que a observação também seja copiada
+          ));
+        }
+      }
     }
+    _filaPastel = itensPastel;
+    notifyListeners();
+  } catch (e) {
+    print('Erro ao preparar a fila de pastéis: $e');
   }
+}
 
   Future<void> avancarFila() async {
     if (_filaPastel.isNotEmpty) {
