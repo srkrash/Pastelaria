@@ -327,6 +327,40 @@ def get_itens_pedido():
     
     return jsonify(lista_final)
 
+@app.route('/pedidos/hoje', methods=['GET'])
+def get_pedidos_hoje():
+    """
+    Retorna a lista de todos os pedidos criados na data atual.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
+    
+    query = """
+        SELECT 
+            id_pedido, 
+            status, 
+            "dataHora"
+        FROM 
+            pedidos
+        WHERE
+            DATE("dataHora") = CURRENT_DATE
+        ORDER BY
+            "dataHora" DESC;
+    """
+    
+    try:
+        cur.execute(query)
+        pedidos = cur.fetchall()
+        
+        return jsonify([dict(p) for p in pedidos])
+        
+    except Exception as e:
+        print(f"Erro ao buscar pedidos do dia: {e}")
+        return jsonify({"error": "Erro interno do servidor"}), 500
+    
+    finally:
+        cur.close()
+        conn.close()
 STATUS_POSSIVEIS = ['aguardando', 'em_preparacao', 'pronto', 'entregue', 'cancelado']
 
 @app.route('/itens-pedido/<int:item_id>/status', methods=['PUT'])

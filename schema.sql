@@ -4,7 +4,15 @@ CREATE TABLE produtos (
     nome VARCHAR(100) NOT NULL UNIQUE,
     descricao TEXT,
     preco DECIMAL(10, 2) NOT NULL,
-    tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('pastel', 'pastel_completo', 'ingrediente', 'bebida', 'salgado')),
+    tipo VARCHAR(50) NOT NULL CHECK (
+        tipo IN (
+            'pastel',
+            'pastel_completo',
+            'ingrediente',
+            'bebida',
+            'salgado'
+        )
+    ),
     ativo BOOLEAN DEFAULT TRUE
 );
 
@@ -15,6 +23,13 @@ CREATE TABLE pedidos (
     data_hora_pedido TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     observacoes TEXT,
     total_pedido DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    "status" VARCHAR(50) NOT NULL DEFAULT 'aberto' CHECK (
+        "status" IN (
+            'aberto',
+            'fechado',
+            'cancelado'
+        )
+    ),
     reset_data DATE DEFAULT CURRENT_DATE,
     CONSTRAINT unq_numero_pedido_reset_data UNIQUE (numero_pedido, reset_data)
 );
@@ -27,7 +42,15 @@ CREATE TABLE itens_pedido (
     quantidade INTEGER NOT NULL DEFAULT 1 CHECK (quantidade > 0),
     preco_unitario DECIMAL(10, 2) NOT NULL,
     subtotal DECIMAL(10, 2) NOT NULL,
-    status_item VARCHAR(50) NOT NULL DEFAULT 'aguardando' CHECK (status_item IN ('aguardando', 'em_preparacao', 'pronto', 'entregue', 'cancelado')),
+    status_item VARCHAR(50) NOT NULL DEFAULT 'aguardando' CHECK (
+        status_item IN (
+            'aguardando',
+            'em_preparacao',
+            'pronto',
+            'entregue',
+            'cancelado'
+        )
+    ),
     observacoes_item TEXT
 );
 
@@ -40,3 +63,41 @@ CREATE TABLE past_ingredientes (
 );
 
 
+CREATE
+OR REPLACE FUNCTION verificar_e_atualizar_status_pedido() RETURNS TRIGGER AS $$
+DECLARE
+    all_items_delivered BOOLEAN;
+BEGIN
+    -- Verifica se todos os itens do pedido em questão estão 'entregue'.
+    SELECT
+        COUNT(*) = SUM(
+            CASE
+                WHEN status_item = 'entregue' THEN 1
+                ELSE 0
+            END
+        )
+    INTO all_items_delivered
+    FROM
+        itens_pedido
+    WHERE
+        id_pedido = NEW.id_pedido;
+
+    -- Se todos os itens estiverem entregues, atualiza o status do pedido para 'finalizado'.
+    IF all_items_delivered THEN
+        UPDATE
+            pedidos
+        SET
+            status = 'finalizado'
+        WHERE
+            id_pedido = NEW.id_pedido;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE TRIGGER atualizar_status_pedido
+AFTER UPDATE OF "status_item" ON itens_pedido
+FOR EACH ROW
+EXECUTE FUNCTION verificar_e_atualizar_status_pedido();

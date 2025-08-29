@@ -1,12 +1,12 @@
 // lib/providers/pedidos_provider.dart
 import 'package:flutter/material.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../models/item_pedido.dart';
 import '../services/api_service.dart';
 
 class PedidosProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
-  late final IO.Socket _socket;
+  late final io.Socket _socket;
 
   List<ItemPedido> _itensPedido = [];
   List<ItemPedido> _filaPastel = [];
@@ -21,7 +21,7 @@ class PedidosProvider with ChangeNotifier {
   }
 
   PedidosProvider()
-      : _socket = IO.io('http://localhost:5000', <String, dynamic>{
+      : _socket =io.io('http://localhost:5000', <String, dynamic>{
           'transports': <String>['websocket'],
           'autoConnect': false,
         }) {
