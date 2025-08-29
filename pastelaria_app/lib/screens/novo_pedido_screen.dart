@@ -32,6 +32,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
     if (resultado != null) {
       final quantidade = resultado['quantidade'] as int;
       final ingredientes = resultado['ingredientes'] as List<String>;
+      final observacoes = resultado['observacoesItem'] as String;
 
       String produtoNome = 'Pastel';
 
@@ -40,52 +41,60 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
         quantidade: quantidade,
         produtoNome: produtoNome,
         statusItem: 'aguardando',
+        preco: 0.0,
         ingredientes: ingredientes,
-        observacoesItem: '',
+        observacoesItem: observacoes,
       );
 
       pedidosProvider.adicionarItem(novoItem);
     }
   }
 
-  double _calcularSubtotal() {
-    double total = 0.0;
-    final List<String> ingredientesGratuitos = [
-      'Cebola',
-      'Cebolinha',
-      'Orégano'
-    ];
+// lib/screens/novo_pedido_screen.dart
+// ... (imports e classe NovoPedidoScreenState) ...
 
-    for (var item in Provider.of<PedidosProvider>(context).itensPedidoAtual) {
-      // Lógica de precificação para pastéis
-      if (item.produtoNome.startsWith('Pastel')) {
-        if (item.ingredientes.length == 1 && item.ingredientes.first == 'Pizza') {
-        total += 15.00 * item.quantidade;
-        } 
-        else if (item.ingredientes.length == 1 && item.ingredientes.first == 'Misto') {
-          total += 25.00 * item.quantidade;
-        }
-        else{
-          final List<String> ingredientesPagos = item.ingredientes
-              .where((ing) => !ingredientesGratuitos.contains(ing))
-              .toList();
+// Função auxiliar para calcular o preço de um pastel específico.
+double _calcularPrecoPastel(ItemPedido item) {
+  final List<String> ingredientesGratuitos = [
+    'Cebola',
+    'Cebolinha',
+    'Orégano'
+  ];
 
-          double precoBase = 12.00;
-          int numIngredientesPagos = ingredientesPagos.length;
+  if (item.ingredientes.length == 1 && item.ingredientes.first == 'Pizza') {
+    return 15.00 * item.quantidade;
+  } else if (item.ingredientes.length == 1 && item.ingredientes.first == 'Misto') {
+    return 25.00 * item.quantidade;
+  } else {
+    // Lógica para pastéis com ingredientes extras.
+    final List<String> ingredientesPagos = item.ingredientes
+        .where((ing) => !ingredientesGratuitos.contains(ing))
+        .toList();
 
-          if (numIngredientesPagos > 2) {
-            precoBase += (numIngredientesPagos - 2) * 3.00;
-          }
-          total += precoBase * item.quantidade;
-        }
-      }
-      else {
-        total += VALOR * item.quantidade;
-      }
-      // TODO: Adicionar lógica para outros produtos (bebidas, salgados)
+    double precoBase = 12.00;
+    int numIngredientesPagos = ingredientesPagos.length;
+
+    if (numIngredientesPagos > 2) {
+      precoBase += (numIngredientesPagos - 2) * 3.00;
     }
-    return total;
+    return precoBase * item.quantidade;
   }
+}
+
+// A função principal de cálculo do subtotal.
+double _calcularSubtotal() {
+  double total = 0.0;
+  for (var item in Provider.of<PedidosProvider>(context).itensPedidoAtual) {
+    if (item.produtoNome.startsWith('Pastel')) {
+      // Delega o cálculo do preço do pastel para a função auxiliar.
+      total += _calcularPrecoPastel(item);
+    } else {
+      // Usa o preço direto para salgados e bebidas.
+      total += (item.preco) * item.quantidade;
+    }
+  }
+  return total;
+}
 
  void _navigateAndAddProducts(BuildContext context, String productType) async {
     final pedidosProvider = Provider.of<PedidosProvider>(context, listen: false);

@@ -43,6 +43,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       final int productId = product['id'];
       final String productName = product['nome'];
       final int quantidade = _quantidades[productId] ?? 0;
+      final double preco = double.tryParse(product['preco']?.toString() ?? '0.0') ?? 0.0;
       
       if (quantidade > 0) {
         itensSelecionados.add(
@@ -51,6 +52,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
             quantidade: quantidade,
             produtoNome: productName,
             statusItem: 'aguardando', // Status inicial
+            preco: preco,
             ingredientes: [], // Bebidas e salgados não têm ingredientes
             observacoesItem: '', // Sem observações por padrão
           ),
@@ -89,10 +91,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   itemBuilder: (context, index) {
                     final product = products[index];
                     final int quantidade = _quantidades[product['id']] ?? 0;
-
+                    final double preco = (product['preco'] as num? ?? 0.0).toDouble();
                     return ListTile(
                       title: Text(product['nome'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text('R\$${product['preco']}'),
+                      subtitle: Text('R\$${preco.toStringAsFixed(2)}'),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [

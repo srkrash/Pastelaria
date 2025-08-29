@@ -103,11 +103,16 @@ void initState() {
                 'Item #${item.id}',
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 20),
               Text(
-                'Ingredientes: \n${item.ingredientes.join('\n')}',
+                item.ingredientes.join('\n'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                item.observacoesItem,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
             ],
           ),

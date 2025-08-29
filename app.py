@@ -59,18 +59,24 @@ def home():
 def get_produtos():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=DictCursor)
-    # Obtém o parâmetro 'tipo' da URL, se existir
     tipo_filtro = request.args.get('tipo')
     query = "SELECT id, nome, preco, tipo FROM produtos WHERE ativo = TRUE"
     params = []
+
     if tipo_filtro:
         query += " AND tipo = %s"
         params.append(tipo_filtro)
+
     query += " ORDER BY tipo, nome;"
     cur.execute(query, params)
     produtos = cur.fetchall()
     cur.close()
     conn.close()
+
+    for p in produtos:
+        if 'preco' in p and p['preco'] is not None:
+            p['preco'] = float(p['preco'])
+
     return jsonify([dict(p) for p in produtos])
 
 @app.route('/pedidos/<int:pedido_id>', methods=['GET'])
@@ -218,6 +224,7 @@ def criar_pedido():
                 'produto_tipo': tipo_produto,
                 'quantidade': quantidade_item,
                 'status_item': status_item,
+                'preco': subtotal_item,
                 'observacoes_item': observacoes_item,
                 'ingredientes': [] # Inicializa a lista de ingredientes
             }

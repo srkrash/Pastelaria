@@ -129,8 +129,9 @@ class _AddPastelScreenState extends State<AddPastelScreen> {
                       'quantidade': _quantidade,
                       'ingredientes': ingredientes,
                       'tipo_pastel': 'none',
-                      'observacoesItem': _observacoesController.text,
+                      'observacoesItem': (_observacoesController.text.isEmpty) ? '' : _observacoesController.text,
                     };
+                    print(resultado);
                     Navigator.of(context).pop(resultado);
                   },
                   style: ElevatedButton.styleFrom(

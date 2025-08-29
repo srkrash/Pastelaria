@@ -95,7 +95,6 @@ Future<void> prepareFilaPastel() async {
     // Busca itens com status 'aguardando' OU 'em_producao'
     _itensPedido =
         await _apiService.getItensPorStatus(['aguardando', 'em_producao']);
-
     List<ItemPedido> itensPastel = [];
     for (var item in _itensPedido) {
       // Condição atualizada para incluir todos os tipos de pastéis
@@ -107,6 +106,7 @@ Future<void> prepareFilaPastel() async {
             quantidade: 1, // Fixa a quantidade em 1
             produtoNome: item.produtoNome,
             statusItem: item.statusItem,
+            preco: item.preco,
             ingredientes: item.ingredientes,
             observacoesItem: item.observacoesItem, // Adicione este campo para que a observação também seja copiada
           ));
@@ -120,6 +120,7 @@ Future<void> prepareFilaPastel() async {
             quantidade: 1, // Fixa a quantidade em 1
             produtoNome: item.produtoNome,
             statusItem: item.statusItem,
+            preco: item.preco,
             ingredientes: [item.produtoNome],
             observacoesItem: item.observacoesItem, // Adicione este campo para que a observação também seja copiada
           ));
@@ -169,7 +170,9 @@ Future<void> prepareFilaPastel() async {
           quantidade: _filaPastel[i].quantidade,
           produtoNome: _filaPastel[i].produtoNome,
           statusItem: novoStatus, // Atualiza o status
+          preco: _filaPastel[i].preco,
           ingredientes: _filaPastel[i].ingredientes,
+          observacoesItem: _filaPastel[i].observacoesItem,
         );
         _filaPastel[i] = itemAtualizado;
       }
@@ -201,6 +204,7 @@ Future<void> prepareFilaPastel() async {
           quantidade: _filaPastel[i].quantidade,
           produtoNome: _filaPastel[i].produtoNome,
           statusItem: novoStatus,
+          preco: _filaPastel[i].preco,
           ingredientes: _filaPastel[i].ingredientes,
           observacoesItem: _filaPastel[i].observacoesItem,
         );
