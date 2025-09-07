@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pastelaria_app/screens/novo_pedido_screen.dart'; // Importe o nome correto da tela
+import 'package:pastelaria_app/screens/editar_pedidos_screen.dart';
 
 class PedidoScreen extends StatelessWidget {
   const PedidoScreen({super.key});
@@ -33,7 +34,11 @@ class PedidoScreen extends StatelessWidget {
                 context,
                 text: 'Editar Pedido',
                 onPressed: () {
-                  print('Editar Pedido pressionado!');
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const EditarPedidosScreen(), // Use o nome correto da classe
+                    ),
+                  );
                 },
               ),
             ],

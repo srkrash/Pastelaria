@@ -1,4 +1,4 @@
--- Tabela para o catálogo de produtos fixos: pastéis base, ingredientes, bebidas e pastéis completos.
+-- Tabela para o catálogo de produtos fixos: pastéis base, ingredientesn e bebidas.
 CREATE TABLE produtos (
     id SERIAL PRIMARY KEY,
     nome VARCHAR(100) NOT NULL UNIQUE,
@@ -7,7 +7,6 @@ CREATE TABLE produtos (
     tipo VARCHAR(50) NOT NULL CHECK (
         tipo IN (
             'pastel',
-            'pastel_completo',
             'ingrediente',
             'bebida',
             'salgado'
@@ -63,40 +62,30 @@ CREATE TABLE past_ingredientes (
 );
 
 
-CREATE
-OR REPLACE FUNCTION verificar_e_atualizar_status_pedido() RETURNS TRIGGER AS $$
+-- Função de trigger para atualizar o status do pedido quando todos os itens forem entregues
+CREATE OR REPLACE FUNCTION verificar_e_atualizar_status_pedido()
+RETURNS TRIGGER AS $$
 DECLARE
-    all_items_delivered BOOLEAN;
+total_itens INTEGER;
+itens_entregues INTEGER;
 BEGIN
-    -- Verifica se todos os itens do pedido em questão estão 'entregue'.
-    SELECT
-        COUNT(*) = SUM(
-            CASE
-                WHEN status_item = 'entregue' THEN 1
-                ELSE 0
-            END
-        )
-    INTO all_items_delivered
-    FROM
-        itens_pedido
-    WHERE
-        id_pedido = NEW.id_pedido;
-
-    -- Se todos os itens estiverem entregues, atualiza o status do pedido para 'finalizado'.
-    IF all_items_delivered THEN
-        UPDATE
-            pedidos
-        SET
-            status = 'finalizado'
-        WHERE
-            id_pedido = NEW.id_pedido;
-    END IF;
-
-    RETURN NEW;
+SELECT
+COUNT(*),
+SUM(CASE WHEN "status_item" = 'entregue' THEN 1 ELSE 0 END)
+INTO total_itens, itens_entregues
+FROM itens_pedido
+WHERE "pedido_id" = NEW."pedido_id";
+IF total_itens = itens_entregues THEN
+    UPDATE pedidos
+    SET status = 'fechado'
+    WHERE id = NEW.pedido_id;
+END IF;
+RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
 
+-- Trigger para atualizar o status do pedido quando um item for entregue
 CREATE TRIGGER atualizar_status_pedido
 AFTER UPDATE OF "status_item" ON itens_pedido
 FOR EACH ROW
