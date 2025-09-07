@@ -7,6 +7,34 @@ import '../models/item_pedido.dart';
 const String baseUrl = 'http://localhost:5000';
 
 class ApiService {
+  Future<List<dynamic>> getPedidosHoje() async {
+    final url = Uri.parse('$baseUrl/pedidos/hoje');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Falha ao carregar pedidos: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erro ao conectar com a API: $e');
+    }
+  }
+
+Future<dynamic> getPedidoPorId(int idPedido) async {
+    final url = Uri.parse('$baseUrl/pedidos/$idPedido');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Falha ao carregar o pedido: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erro ao conectar com a API: $e');
+    }
+  }
+
   // Método para obter itens de pedido com filtro de status
   Future<List<ItemPedido>> getItensPorStatus(List<String> statuses) async {
     try {

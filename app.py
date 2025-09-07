@@ -198,8 +198,13 @@ def criar_pedido():
                     ing for ing in ingredientes
                     if ing['nome'].lower() not in ['cebola', 'cebolinha', 'orégano']
                 ]
+                pastel_especial = [ing for ing in ingredientes_pagos if ing['nome'].lower() == 'misto' or ing['nome'].lower() == 'pizza']
                 num_ingredientes = len(ingredientes_pagos)
-                if num_ingredientes <= 2:
+                if pastel_especial[0]['nome'].lower() == 'misto':
+                    preco_final_item = 25.00
+                elif 'pizza' in ingredientes_pagos:
+                    preco_final_item = 15.00
+                elif num_ingredientes <= 2:
                     preco_final_item = 12.00
                 else:
                     preco_final_item = 12.00 + (num_ingredientes - 2) * 3.00
@@ -337,15 +342,17 @@ def get_pedidos_hoje():
     
     query = """
         SELECT 
-            id_pedido, 
+            id,
+            numero_pedido,
             status, 
-            "dataHora"
+            total_pedido,
+            data_hora_pedido
         FROM 
             pedidos
         WHERE
-            DATE("dataHora") = CURRENT_DATE
+            reset_data = CURRENT_DATE
         ORDER BY
-            "dataHora" DESC;
+            data_hora_pedido DESC;
     """
     
     try:
@@ -361,6 +368,7 @@ def get_pedidos_hoje():
     finally:
         cur.close()
         conn.close()
+
 STATUS_POSSIVEIS = ['aguardando', 'em_preparacao', 'pronto', 'entregue', 'cancelado']
 
 @app.route('/itens-pedido/<int:item_id>/status', methods=['PUT'])
