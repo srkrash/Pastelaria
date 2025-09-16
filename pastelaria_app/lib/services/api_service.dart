@@ -112,4 +112,22 @@ Future<dynamic> getPedidoPorId(int idPedido) async {
       rethrow;
     }
   }
+
+  Future<void> updatePedido(int pedidoId, Map<String, dynamic> dadosPedido) async {
+    final url = Uri.parse('$baseUrl/pedidos/$pedidoId');
+    try {
+      final response = await http.put(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(dadosPedido),
+      );
+      if (response.statusCode != 200) {
+        // Se a API retornar um erro, lança uma exceção com o corpo da resposta
+        throw Exception('Falha ao atualizar pedido: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Erro ao atualizar pedido: $e');
+    }
+  }
+
 }

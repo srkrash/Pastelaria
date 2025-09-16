@@ -24,36 +24,40 @@ def get_db_connection():
     )
     return conn
 
+
 def _get_proximo_numero_pedido():
     conn = get_db_connection()
     cur = conn.cursor()
-    
+
     # Usa o fuso horário correto para a data de reset
     cur.execute("SELECT (NOW() AT TIME ZONE 'America/Sao_Paulo')::DATE;")
-    data_reset = cur.fetchone()[0] # type: ignore
+    data_reset = cur.fetchone()[0]  # type: ignore
 
     try:
         # Usa SELECT FOR UPDATE para evitar que dois clientes peguem o mesmo número
-        cur.execute("SELECT numero_pedido FROM pedidos WHERE reset_data = %s ORDER BY numero_pedido DESC LIMIT 1 FOR UPDATE;", (data_reset,))
+        cur.execute(
+            "SELECT numero_pedido FROM pedidos WHERE reset_data = %s ORDER BY numero_pedido DESC LIMIT 1 FOR UPDATE;", (data_reset,))
         ultimo_numero = cur.fetchone()
-        
+
         if ultimo_numero:
             proximo_numero = ultimo_numero[0] + 1
         else:
             proximo_numero = 1
-        if proximo_numero%100 == 0:
+        if proximo_numero % 100 == 0:
             proximo_numero += 1
 
     finally:
         cur.close()
         conn.close()
-
+    print(f'proximo numero: {proximo_numero}')
     return proximo_numero
+
 
 @app.route('/')
 def home():
     socketio.emit('my_response', {'data': 'Hello, World!'})
     return "Servidor Rodando!"
+
 
 @app.route('/produtos', methods=['GET'])
 def get_produtos():
@@ -79,20 +83,22 @@ def get_produtos():
 
     return jsonify([dict(p) for p in produtos])
 
+
 @app.route('/pedidos/<int:pedido_id>', methods=['GET'])
 def get_pedido_detalhes(pedido_id):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=DictCursor)
-    
+
     pedido_detalhes = {}
 
     try:
-        cur.execute("SELECT numero_pedido, data_hora_pedido, observacoes, total_pedido FROM pedidos WHERE id = %s;", (pedido_id,))
+        cur.execute(
+            "SELECT numero_pedido, data_hora_pedido, observacoes, total_pedido FROM pedidos WHERE id = %s;", (pedido_id,))
         pedido = cur.fetchone()
-        
+
         if not pedido:
             return jsonify({"erro": "Pedido não encontrado."}), 404
-        
+
         pedido_detalhes = dict(pedido)
         pedido_detalhes['itens'] = []
 
@@ -109,12 +115,12 @@ def get_pedido_detalhes(pedido_id):
             JOIN produtos p ON ip.produto_id = p.id
             WHERE ip.pedido_id = %s;
         """, (pedido_id,))
-        
+
         itens = cur.fetchall()
 
         for item in itens:
             item_dict = dict(item)
-            
+
             # Se for um pastel customizado, obtenha os ingredientes
             if item_dict['produto_tipo'] == 'pastel':
                 cur.execute("""
@@ -123,10 +129,11 @@ def get_pedido_detalhes(pedido_id):
                     JOIN produtos p ON pi.ingrediente_id = p.id
                     WHERE pi.item_pedido_id = %s;
                 """, (item_dict['item_id'],))
-                
+
                 ingredientes = cur.fetchall()
-                item_dict['ingredientes'] = [i['ingrediente_nome'] for i in ingredientes]
-            
+                item_dict['ingredientes'] = [i['ingrediente_nome']
+                                             for i in ingredientes]
+
             pedido_detalhes['itens'].append(item_dict)
 
     except Exception as e:
@@ -134,8 +141,9 @@ def get_pedido_detalhes(pedido_id):
     finally:
         cur.close()
         conn.close()
-    
+
     return jsonify(pedido_detalhes)
+
 
 @app.route('/pedidos', methods=['POST'])
 def criar_pedido():
@@ -147,22 +155,22 @@ def criar_pedido():
 
     try:
         cur = conn.cursor(cursor_factory=DictCursor)
-        conn.autocommit = False # Inicia a transação
-        
+        conn.autocommit = False  # Inicia a transação
+
         # 1. Gerar o próximo número do pedido
         proximo_numero = _get_proximo_numero_pedido()
-        
+
         # 2. Obter os dados principais do pedido
         observacoes_pedido = data.get('observacoes_pedido', '')
-        
+        print(data)
         # 3. Inserir o pedido principal com o total inicial de 0.00
         cur.execute("""
             INSERT INTO pedidos (numero_pedido, observacoes, total_pedido)
             VALUES (%s, %s, %s) RETURNING id;
         """, (proximo_numero, observacoes_pedido, 0.00))
         pedido_dados = cur.fetchone()
-        pedido_id = pedido_dados['id'] # type: ignore
-        
+        pedido_id = pedido_dados['id']  # type: ignore
+
         novo_pedido_detalhes = {
             'pedido_id': pedido_id,
             'numero_pedido': proximo_numero,
@@ -171,7 +179,7 @@ def criar_pedido():
         }
 
         total_pedido = 0.00
-        
+
         # 4. Processar e inserir os itens do pedido
         for item_data in data['itens']:
             produto_nome = item_data['produto_nome']
@@ -180,16 +188,17 @@ def criar_pedido():
             ingredientes = item_data.get('ingredientes', [])
 
             # Obter dados do produto
-            cur.execute("SELECT id, preco, tipo FROM produtos WHERE nome = %s;", (produto_nome,))
+            cur.execute(
+                "SELECT id, preco, tipo FROM produtos WHERE nome = %s;", (produto_nome,))
             produto_info = cur.fetchone()
-            
+
             if not produto_info:
                 raise Exception(f"Produto '{produto_nome}' não encontrado.")
 
             produto_id = produto_info['id']
             preco_base_produto = float(produto_info['preco'])
             tipo_produto = produto_info['tipo']
-            
+
             preco_final_item = preco_base_produto
 
             # Lógica de precificação para pastéis customizados
@@ -198,30 +207,38 @@ def criar_pedido():
                     ing for ing in ingredientes
                     if ing['nome'].lower() not in ['cebola', 'cebolinha', 'orégano']
                 ]
-                pastel_especial = [ing for ing in ingredientes_pagos if ing['nome'].lower() == 'misto' or ing['nome'].lower() == 'pizza']
-                num_ingredientes = len(ingredientes_pagos)
-                if pastel_especial[0]['nome'].lower() == 'misto':
-                    preco_final_item = 25.00
-                elif 'pizza' in ingredientes_pagos:
-                    preco_final_item = 15.00
-                elif num_ingredientes <= 2:
-                    preco_final_item = 12.00
-                else:
-                    preco_final_item = 12.00 + (num_ingredientes - 2) * 3.00
+                is_special = False
+                for ing in ingredientes_pagos:
+                    if ing['nome'].lower() == 'misto':
+                        preco_final_item = 25.00
+                        is_special = True
+                        break
+                    elif ing['nome'].lower() == 'pizza':
+                        preco_final_item = 15.00
+                        is_special = True
+                        break
+    
+                # Se não for um pastel especial, aplica a lógica de precificação por ingredientes
+                if not is_special:
+                    num_ingredientes = len(ingredientes_pagos)
+                    if num_ingredientes <= 2:
+                        preco_final_item = 12.00
+                    else:
+                        preco_final_item = 12.00 + (num_ingredientes - 2) * 3.00
 
             subtotal_item = preco_final_item * quantidade_item
             total_pedido += subtotal_item
-
+            print(f'total pedido:{total_pedido}')
             # Inserir item do pedido
             cur.execute("""
                 INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco_unitario, subtotal, observacoes_item)
                 VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, status_item;
             """, (pedido_id, produto_id, quantidade_item, preco_final_item, subtotal_item, observacoes_item))
-            
+
             item_info = cur.fetchone()
             print(item_info)
-            item_pedido_id = item_info['id'] # type: ignore
-            status_item = item_info['status_item'] # type: ignore
+            item_pedido_id = item_info['id']  # type: ignore
+            status_item = item_info['status_item']  # type: ignore
 
             item_para_ws = {
                 'item_id': item_pedido_id,
@@ -231,50 +248,54 @@ def criar_pedido():
                 'status_item': status_item,
                 'preco': subtotal_item,
                 'observacoes_item': observacoes_item,
-                'ingredientes': [] # Inicializa a lista de ingredientes
+                'ingredientes': []  # Inicializa a lista de ingredientes
             }
-            
+
             # Se for um pastel customizado, inserir os ingredientes
             if tipo_produto == 'pastel':
                 for ingrediente_data in ingredientes:
-                    cur.execute("SELECT id FROM produtos WHERE nome = %s;", (ingrediente_data['nome'],))
+                    cur.execute(
+                        "SELECT id FROM produtos WHERE nome = %s;", (ingrediente_data['nome'],))
                     ingrediente_info = cur.fetchone()
-                    ingrediente_id = ingrediente_info['id'] # type: ignore
-                    
+                    ingrediente_id = ingrediente_info['id']  # type: ignore
+
                     cur.execute("""
                         INSERT INTO past_ingredientes (item_pedido_id, ingrediente_id, quantidade)
                         VALUES (%s, %s, %s);
                     """, (item_pedido_id, ingrediente_id, ingrediente_data.get('quantidade', 1)))
-                    
-                    item_para_ws['ingredientes'].append(ingrediente_data['nome'])
+
+                    item_para_ws['ingredientes'].append(
+                        ingrediente_data['nome'])
 
             novo_pedido_detalhes['itens'].append(item_para_ws)
 
         # 5. Atualizar o total_pedido no registro principal
-        cur.execute("UPDATE pedidos SET total_pedido = %s WHERE id = %s;", (total_pedido, pedido_id))
+        cur.execute("UPDATE pedidos SET total_pedido = %s WHERE id = %s;",
+                    (total_pedido, pedido_id))
         novo_pedido_detalhes['total_pedido'] = total_pedido
 
-        conn.commit() # Confirma todas as inserções
-        
+        conn.commit()  # Confirma todas as inserções
+
         socketio.emit('novo_pedido', novo_pedido_detalhes)
-        
+
     except Exception as e:
-        conn.rollback() # Reverte todas as inserções em caso de erro
+        conn.rollback()  # Reverte todas as inserções em caso de erro
         return jsonify({"erro": str(e)}), 500
     finally:
-        cur.close() # type: ignore
+        cur.close()  # type: ignore
         conn.close()
 
     return jsonify({"mensagem": "Pedido criado com sucesso.", "numero_pedido": proximo_numero, "total_pedido": total_pedido}), 201
+
 
 @app.route('/pedidos/itens', methods=['GET'])
 def get_itens_pedido():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=DictCursor)
-    
+
     # Parâmetros de filtro da URL
     status_filtro = request.args.get('status_item')
-    
+
     # Lógica para construir a query SQL com base no filtro
     query = """
         SELECT
@@ -290,23 +311,23 @@ def get_itens_pedido():
         JOIN produtos p ON ip.produto_id = p.id
         JOIN pedidos pe ON ip.pedido_id = pe.id
     """
-    
+
     if status_filtro:
         query += " WHERE ip.status_item = %s"
         params = (status_filtro,)
     else:
         params = ()
-        
+
     query += " ORDER BY pe.data_hora_pedido, ip.id;"
-    
+
     try:
         cur.execute(query, params)
         itens = cur.fetchall()
-        
+
         lista_final = []
         for item in itens:
             item_dict = dict(item)
-            
+
             if item_dict['produto_tipo'] == 'pastel':
                 cur_ingredientes = conn.cursor(cursor_factory=DictCursor)
                 cur_ingredientes.execute("""
@@ -315,12 +336,14 @@ def get_itens_pedido():
                     JOIN produtos p ON pi.ingrediente_id = p.id
                     WHERE pi.item_pedido_id = %s;
                 """, (item_dict['item_id'],))
-                
+
                 ingredientes = cur_ingredientes.fetchall()
-                item_dict['ingredientes'] = [i['ingrediente_nome'] for i in ingredientes]
+                item_dict['ingredientes'] = [i['ingrediente_nome']
+                                             for i in ingredientes]
                 cur_ingredientes.close()
             else:
-                item_dict['ingredientes'] = [] # Garante que a chave 'ingredientes' exista
+                # Garante que a chave 'ingredientes' exista
+                item_dict['ingredientes'] = []
 
             lista_final.append(item_dict)
 
@@ -329,8 +352,9 @@ def get_itens_pedido():
     finally:
         cur.close()
         conn.close()
-    
+
     return jsonify(lista_final)
+
 
 @app.route('/pedidos/hoje', methods=['GET'])
 def get_pedidos_hoje():
@@ -339,7 +363,7 @@ def get_pedidos_hoje():
     """
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=DictCursor)
-    
+
     query = """
         SELECT 
             id,
@@ -354,22 +378,25 @@ def get_pedidos_hoje():
         ORDER BY
             data_hora_pedido DESC;
     """
-    
+
     try:
         cur.execute(query)
         pedidos = cur.fetchall()
-        
+
         return jsonify([dict(p) for p in pedidos])
-        
+
     except Exception as e:
         print(f"Erro ao buscar pedidos do dia: {e}")
         return jsonify({"error": "Erro interno do servidor"}), 500
-    
+
     finally:
         cur.close()
         conn.close()
 
-STATUS_POSSIVEIS = ['aguardando', 'em_preparacao', 'pronto', 'entregue', 'cancelado']
+
+STATUS_POSSIVEIS = ['aguardando', 'em_preparacao',
+                    'pronto', 'entregue', 'cancelado']
+
 
 @app.route('/itens-pedido/<int:item_id>/status', methods=['PUT'])
 def atualizar_status_item(item_id):
@@ -391,13 +418,13 @@ def atualizar_status_item(item_id):
             SET status_item = %s
             WHERE id = %s RETURNING pedido_id;
         """, (novo_status, item_id))
-        
+
         resultado = cur.fetchone()
-        
+
         if not resultado:
             conn.rollback()
             return jsonify({"erro": "Item do pedido não encontrado."}), 404
-        
+
         pedido_id = resultado[0]
 
         conn.commit()
@@ -421,6 +448,53 @@ def atualizar_status_item(item_id):
         "mensagem": f"Status do item {item_id} atualizado para '{novo_status}'.",
         "pedido_id": pedido_id
     }), 200
+
+
+@app.route('/pedidos/<int:pedido_id>', methods=['PUT'])
+def atualizar_pedido(pedido_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    data = request.get_json()
+
+    try:
+        # Atualiza o pedido principal com observações e total_pedido
+        cur.execute("""
+            UPDATE pedidos
+            SET observacoes = %s, total_pedido = %s
+            WHERE id = %s;
+        """, (data.get('observacoes'), data.get('total_pedido'), pedido_id))
+
+        # Deleta itens que foram removidos
+        itens_para_remover = data.get('itens_para_remover', [])
+        for item_id in itens_para_remover:
+            cur.execute("DELETE FROM itens_pedido WHERE id = %s;", (item_id,))
+        
+        # Atualiza a quantidade e observações de itens existentes
+        itens_para_atualizar = data.get('itens_para_atualizar', [])
+        for item in itens_para_atualizar:
+            cur.execute("""
+                UPDATE itens_pedido
+                SET quantidade = %s, observacoes_item = %s
+                WHERE id = %s;
+            """, (item.get('quantidade'), item.get('observacoes_item'), item.get('id')))
+
+        # Adiciona novos itens ao pedido
+        itens_para_adicionar = data.get('itens_para_adicionar', [])
+        for item in itens_para_adicionar:
+            cur.execute("""
+                INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, observacoes_item, status_item, preco)
+                VALUES (%s, %s, %s, %s, %s, %s);
+            """, (pedido_id, item.get('produto_id'), item.get('quantidade'), item.get('observacoes_item'), item.get('status_item'), item.get('preco')))
+            
+        conn.commit()
+        return jsonify({"mensagem": "Pedido atualizado com sucesso!"}), 200
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)
