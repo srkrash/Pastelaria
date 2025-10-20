@@ -16,13 +16,15 @@ class NovoPedidoScreen extends StatefulWidget {
 
 class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
   bool _isLoading = false;
+  // Instancia o serviço de API
   final ApiService _apiService = ApiService();
 
-  // Método para navegar e adicionar itens do pastel
+  // Método para navegar e adicionar itens do pastel customizado
   void _navigateAndAddItem(BuildContext context) async {
     final PedidosProvider pedidosProvider =
         Provider.of<PedidosProvider>(context, listen: false);
 
+    // Navega e espera o resultado da tela de adição de pastel (AddPastelScreen)
     final resultado = await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const AddPastelScreen(),
@@ -34,14 +36,17 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
       final ingredientes = resultado['ingredientes'] as List<String>;
       final observacoes = resultado['observacoesItem'] as String;
 
+      // Nome padrão para o pastel customizado
       String produtoNome = 'Pastel';
-
+      
+      // Cria o novo item e adiciona ao pedido
       final novoItem = ItemPedido(
         id: 0,
         quantidade: quantidade,
         produtoNome: produtoNome,
         statusItem: 'aguardando',
-        preco: 0.0,
+        // O preço é 0.0 aqui, pois será calculado dinamicamente no _calcularSubtotal
+        preco: 0.0, 
         ingredientes: ingredientes,
         observacoesItem: observacoes,
       );
@@ -50,53 +55,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
     }
   }
 
-// lib/screens/novo_pedido_screen.dart
-// ... (imports e classe NovoPedidoScreenState) ...
-
-// Função auxiliar para calcular o preço de um pastel específico.
-double _calcularPrecoPastel(ItemPedido item) {
-  final List<String> ingredientesGratuitos = [
-    'Cebola',
-    'Cebolinha',
-    'Orégano'
-  ];
-
-  if (item.ingredientes.length == 1 && item.ingredientes.first == 'Pizza') {
-    return 15.00 * item.quantidade;
-  } else if (item.ingredientes.length == 1 && item.ingredientes.first == 'Misto') {
-    return 25.00 * item.quantidade;
-  } else {
-    // Lógica para pastéis com ingredientes extras.
-    final List<String> ingredientesPagos = item.ingredientes
-        .where((ing) => !ingredientesGratuitos.contains(ing))
-        .toList();
-
-    double precoBase = 12.00;
-    int numIngredientesPagos = ingredientesPagos.length;
-
-    if (numIngredientesPagos > 2) {
-      precoBase += (numIngredientesPagos - 2) * 3.00;
-    }
-    return precoBase * item.quantidade;
-  }
-}
-
-// A função principal de cálculo do subtotal.
-double _calcularSubtotal() {
-  double total = 0.0;
-  for (var item in Provider.of<PedidosProvider>(context).itensPedidoAtual) {
-    if (item.produtoNome.startsWith('Pastel')) {
-      // Delega o cálculo do preço do pastel para a função auxiliar.
-      total += _calcularPrecoPastel(item);
-    } else {
-      // Usa o preço direto para salgados e bebidas.
-      total += (item.preco) * item.quantidade;
-    }
-  }
-  return total;
-}
-
- void _navigateAndAddProducts(BuildContext context, String productType) async {
+  // Método para navegar e adicionar produtos simples (bebidas, salgados)
+  void _navigateAndAddProducts(BuildContext context, String productType) async {
     final pedidosProvider = Provider.of<PedidosProvider>(context, listen: false);
 
     final resultado = await Navigator.of(context).push(
@@ -111,6 +71,57 @@ double _calcularSubtotal() {
       }
     }
   }
+  
+  // Função auxiliar para calcular o preço de um pastel específico (baseado na sua lógica)
+  double _calcularPrecoPastel(ItemPedido item) {
+    // Ingredientes gratuitos que não contam como 'extra'
+    final List<String> ingredientesGratuitos = [
+      'Cebola',
+      'Cebolinha',
+      'Orégano'
+    ];
+
+    // Caso especial 1: Pastel de Pizza (preço fixo)
+    if (item.ingredientes.length == 1 && item.ingredientes.first == 'Pizza') {
+      return 15.00 * item.quantidade;
+    // Caso especial 2: Pastel Misto (preço fixo)
+    } else if (item.ingredientes.length == 1 && item.ingredientes.first == 'Misto') {
+      return 25.00 * item.quantidade;
+    } else {
+      // Lógica para pastéis customizados.
+      
+      // Filtra os ingredientes que são pagos
+      final List<String> ingredientesPagos = item.ingredientes
+          .where((ing) => !ingredientesGratuitos.contains(ing))
+          .toList();
+
+      double precoBase = 12.00; // Preço base do pastel
+      int numIngredientesPagos = ingredientesPagos.length;
+
+      // Cobra R$ 3,00 por ingrediente pago acima de 2
+      if (numIngredientesPagos > 2) {
+        precoBase += (numIngredientesPagos - 2) * 3.00;
+      }
+      return precoBase * item.quantidade;
+    }
+  }
+
+  // A função principal de cálculo do subtotal do pedido.
+  double _calcularSubtotal() {
+    double total = 0.0;
+    // Usa listen: false pois esta função é chamada dentro de build e não precisa de rebuilds internos
+    for (var item in Provider.of<PedidosProvider>(context, listen: false).itensPedidoAtual) {
+      if (item.produtoNome.contains('Pastel')) {
+        // Delega o cálculo do preço do pastel
+        total += _calcularPrecoPastel(item);
+      } else {
+        // Usa o preço direto para salgados e bebidas.
+        total += (item.preco) * item.quantidade;
+      }
+    }
+    return total;
+  }
+
   // Função para confirmar o pedido usando o ApiService
   Future<void> _confirmarPedido(PedidosProvider pedidosProvider) async {
     if (pedidosProvider.itensPedidoAtual.isEmpty) {
@@ -126,6 +137,9 @@ double _calcularSubtotal() {
       _isLoading = true;
     });
 
+    final double valorTotal = _calcularSubtotal();
+
+    // Mapeia os itens para o formato esperado pelo payload da API
     final List<Map<String, dynamic>> itensData =
         pedidosProvider.itensPedidoAtual.map((item) {
       return {
@@ -138,9 +152,11 @@ double _calcularSubtotal() {
       };
     }).toList();
 
+    // Monta o payload completo
     final pedidoPayload = {
+      'valor_total': valorTotal, 
       'observacoes_pedido':
-          '', // Adicione a observação do pedido se for necessário
+          '', 
       'itens': itensData,
     };
 
@@ -154,8 +170,8 @@ double _calcularSubtotal() {
                 'Pedido #${response['numero_pedido']} confirmado com sucesso!')),
       );
 
+      // Limpa o pedido atual e volta para a tela anterior
       pedidosProvider.limparPedido();
-      // Opcional: Navegar para outra tela ou fechar a atual
       Navigator.of(context).pop();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -167,113 +183,32 @@ double _calcularSubtotal() {
       });
     }
   }
-
-  @override
-  Widget build(BuildContext context) {
-    final pedidosProvider = Provider.of<PedidosProvider>(context);
-    final bool canConfirm = pedidosProvider.itensPedidoAtual.isNotEmpty && !_isLoading;
-
-    // NOVO: Calcula o subtotal e formata
-    final double subtotal = _calcularSubtotal();
-    final String subtotalFormatado = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(subtotal);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Novo Pedido'),
-      ),
-      body: Column(
-        children: [
-          Container(
-            color: Colors.grey[200],
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildCategoryButton(
-                  context,
-                  text: 'Adicionar Pastel',
-                  onPressed: () => _navigateAndAddItem(context),
-                ),
-                const SizedBox(height: 8.0),
-                _buildCategoryButton(
-                  context,
-                  text: 'Adicionar Bebida',
-                  onPressed: () => _navigateAndAddProducts(context, 'bebida'), // Chama a tela genérica
-                ),
-                const SizedBox(height: 8.0),
-                _buildCategoryButton(
-                  context,
-                  text: 'Adicionar Salgado',
-                  onPressed: () => _navigateAndAddProducts(context, 'salgado'), // Chama a tela genérica
-                ),
-              ],
-            ),
-          ),
-          
-          Expanded(
-            child: Container(
-              color: const Color.fromARGB(235, 255, 245, 237),
-              child: pedidosProvider.itensPedidoAtual.isEmpty
-                  ? const Center(
-                      child: Text('Nenhum item adicionado', style: TextStyle(fontSize: 18)),
-                    )
-                  : ListView.builder(
-                      itemCount: pedidosProvider.itensPedidoAtual.length,
-                      itemBuilder: (context, index) {
-                        final item = pedidosProvider.itensPedidoAtual[index];
-                        return ListTile(
-                          title: Text('${item.quantidade} x ${item.produtoNome}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: item.ingredientes.isEmpty 
-                              ? null 
-                              : Text('- ${item.ingredientes.join(', ')}', style: const TextStyle(fontStyle: FontStyle.normal, fontSize: 18)),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.remove_circle, color: Colors.red),
-                            onPressed: () {
-                              pedidosProvider.removerItem(item);
-                            },
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ),
-          
-          // NOVO: Linha para mostrar o subtotal
-          Container(
-            padding: const EdgeInsets.all(16.0),
-            color: Colors.white,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Subtotal:', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                Text(subtotalFormatado, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-
-        ],
-      ),
-      bottomNavigationBar: _buildBottomBar(context, pedidosProvider, canConfirm),
-    );
-  }
-
-  // ... (métodos _build existentes) ...
+  
+  // Widget auxiliar para os botões de categoria
   Widget _buildCategoryButton(BuildContext context,
       {required String text, required VoidCallback onPressed}) {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 40),
+        backgroundColor: Colors.amber.shade700, // Cor de pastel!
+        foregroundColor: const Color.fromARGB(183, 0, 0, 0),
+        padding: const EdgeInsets.symmetric(vertical: 30),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
-      child: Text(text, textAlign: TextAlign.center, style: const TextStyle(fontSize: 24)),
+      child: Text(
+        text, 
+        textAlign: TextAlign.center, 
+        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+      ),
     );
   }
-
+  
+  // Widget auxiliar para a barra inferior (Cancelar e Confirmar)
   Widget _buildBottomBar(
       BuildContext context, PedidosProvider pedidosProvider, bool canConfirm) {
     return Container(
       padding: const EdgeInsets.all(16.0),
+      color: Colors.white,
       child: Row(
         children: [
           Expanded(
@@ -282,6 +217,7 @@ double _calcularSubtotal() {
                   ? null
                   : () {
                       pedidosProvider.limparPedido();
+                      Navigator.of(context).pop(); // Volta para a tela de navegação
                     },
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 20),
@@ -290,7 +226,7 @@ double _calcularSubtotal() {
                     borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('Cancelar Pedido',
-                  style: TextStyle(fontSize: 18, color: Colors.red)),
+                  style: TextStyle(fontSize: 18, color: Colors.red, fontWeight: FontWeight.bold)),
             ),
           ),
           const SizedBox(width: 16),
@@ -299,18 +235,184 @@ double _calcularSubtotal() {
               onPressed:
                   canConfirm ? () => _confirmarPedido(pedidosProvider) : null,
               style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green.shade600,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
               child: _isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white, 
+                        strokeWidth: 2
+                      ),
+                    )
                   : const Text('Confirmar Pedido',
-                      style: TextStyle(fontSize: 18)),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Observa o Provider para reconstruir a lista de itens e o subtotal
+    final pedidosProvider = Provider.of<PedidosProvider>(context); 
+    final bool canConfirm = pedidosProvider.itensPedidoAtual.isNotEmpty && !_isLoading;
+
+    final double subtotal = _calcularSubtotal();
+    final String subtotalFormatado = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(subtotal);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Novo Pedido (Montagem)'),
+        backgroundColor: Colors.deepOrange, 
+      ),
+      body: Column(
+        children: [
+          // Área dos botões de categoria
+          Container(
+            color: Colors.grey[100],
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildCategoryButton(
+                  context,
+                  text: 'ADICIONAR PASTEL CUSTOMIZADO',
+                  onPressed: () => _navigateAndAddItem(context),
+                ),
+                const SizedBox(height: 8.0),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildCategoryButton(
+                        context,
+                        text: 'ADICIONAR BEBIDA',
+                        onPressed: () => _navigateAndAddProducts(context, 'bebida'),
+                      ),
+                    ),
+                    const SizedBox(width: 8.0),
+                    Expanded(
+                      child: _buildCategoryButton(
+                        context,
+                        text: 'ADICIONAR SALGADO',
+                        onPressed: () => _navigateAndAddProducts(context, 'salgado'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          // Área da Lista de Itens (Comanda)
+          Expanded(
+            child: Container(
+              color: const Color.fromARGB(235, 255, 255, 255), 
+              child: pedidosProvider.itensPedidoAtual.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'Nenhum item adicionado à comanda.', 
+                        style: TextStyle(fontSize: 18, color: Colors.blueGrey)
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: pedidosProvider.itensPedidoAtual.length,
+                      itemBuilder: (context, index) {
+                        final item = pedidosProvider.itensPedidoAtual[index];
+                        // Calcula o preço individual do item para exibição na lista
+                        final itemPreco = item.produtoNome.contains('Pastel') 
+                            ? _calcularPrecoPastel(item) 
+                            : item.preco * item.quantidade;
+                        final itemPrecoFormatado = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(itemPreco);
+                        
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          decoration: BoxDecoration(
+                            border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                          ),
+                          child: ListTile(
+                            leading: Text('${item.quantidade}x', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            title: Text(
+                              item.produtoNome, 
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Exibe os ingredientes se for um pastel customizado
+                                if (item.ingredientes.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4.0),
+                                    child: Text(
+                                      'Ingredientes: ${item.ingredientes.join(', ')}', 
+                                      style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 14)
+                                    ),
+                                  ),
+                                // Exibe as observações
+                                if (item.observacoesItem.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4.0),
+                                    child: Text(
+                                      'OBS: ${item.observacoesItem}', 
+                                      style: TextStyle(fontStyle: FontStyle.normal, fontSize: 14, color: Colors.red.shade700)
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(itemPrecoFormatado, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_forever, color: Colors.red),
+                                  onPressed: () {
+                                    pedidosProvider.removerItem(item);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ),
+          
+          // Rodapé fixo com Subtotal
+          Container(
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.3),
+                  spreadRadius: 1,
+                  blurRadius: 5,
+                  offset: const Offset(0, -3),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Subtotal:', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black)),
+                Text(
+                  subtotalFormatado, 
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.deepOrange.shade700)
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: _buildBottomBar(context, pedidosProvider, canConfirm),
     );
   }
 }

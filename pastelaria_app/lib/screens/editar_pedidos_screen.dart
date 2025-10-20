@@ -1,4 +1,3 @@
-// lib/screens/editar_pedidos_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
@@ -28,6 +27,34 @@ class _EditarPedidosScreenState extends State<EditarPedidosScreen> {
     });
   }
 
+  // Helper para obter a cor do status, seguindo o tema com destaque em âmbar para 'Em Aberto'
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'aberto':
+        return Colors.amber.shade700; // Cor do tema para o status de 'Em Aberto'
+      case 'fechado':
+        return Colors.green.shade700;
+      case 'cancelado':
+        return Colors.red.shade700;
+      default:
+        return Colors.blueGrey;
+    }
+  }
+
+  // Helper para obter o texto formatado do status
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'aberto':
+        return 'Em Aberto';
+      case 'fechado':
+        return 'Finalizado';
+      case 'cancelado':
+        return 'Cancelado';
+      default:
+        return status;
+    }
+  }
+
   void _aplicarFiltro(String? novoStatus) {
     if (novoStatus != null) {
       setState(() {
@@ -41,6 +68,8 @@ class _EditarPedidosScreenState extends State<EditarPedidosScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pedidos do Dia'),
+        backgroundColor: Colors.deepOrange, // Aplicando o tema ambar/laranja
+        foregroundColor: Colors.white, // Ícones e texto em branco
         actions: [
           // Adicionar um botão de recarregar para facilitar os testes
           IconButton(
@@ -60,11 +89,11 @@ class _EditarPedidosScreenState extends State<EditarPedidosScreen> {
                 const Text('Filtrar por Status:', style: TextStyle(fontWeight: FontWeight.bold)),
                 DropdownButton<String>(
                   value: _statusFiltro,
-                  items: const [
-                    DropdownMenuItem(value: 'todos', child: Text('Todos')),
+                  items: [
+                    const DropdownMenuItem(value: 'todos', child: Text('Todos')),
                     DropdownMenuItem(value: 'aberto', child: Text('Em Aberto')),
-                    DropdownMenuItem(value: 'fechado', child: Text('Finalizado')),
-                    DropdownMenuItem(value: 'cancelado', child: Text('Cancelado')),
+                    const DropdownMenuItem(value: 'fechado', child: Text('Finalizado')),
+                    const DropdownMenuItem(value: 'cancelado', child: Text('Cancelado')),
                   ],
                   onChanged: _aplicarFiltro,
                 ),
@@ -89,6 +118,10 @@ class _EditarPedidosScreenState extends State<EditarPedidosScreen> {
                 final pedidosFiltrados = _statusFiltro == 'todos'
                     ? pedidos
                     : pedidos.where((pedido) => pedido['status'] == _statusFiltro).toList();
+                
+                if (pedidosFiltrados.isEmpty) {
+                  return Center(child: Text('Nenhum pedido com status "${_getStatusText(_statusFiltro)}" encontrado.'));
+                }
 
                 final formatter = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
@@ -97,27 +130,34 @@ class _EditarPedidosScreenState extends State<EditarPedidosScreen> {
                   itemBuilder: (context, index) {
                     final pedido = pedidosFiltrados[index];
                     final totalPedido = double.tryParse(pedido['total_pedido']?.toString() ?? '0.0') ?? 0.0;
+                    final status = pedido['status']?.toString() ?? 'desconhecido';
+                    
                     return Card(
+                      elevation: 2,
                       margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
                       child: ListTile(
-                        leading: const Icon(Icons.receipt, color: Colors.blue),
+                        leading: const Icon(Icons.receipt, color: Colors.deepOrange), // Mudado para cor do tema
                         title: Text(
                           'Pedido Nº ${pedido['numero_pedido']}',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text(
-                          'Status: ${pedido['status']}',
+                          'Status: ${_getStatusText(status)}',
+                          style: TextStyle(
+                            color: _getStatusColor(status), // Cor baseada no status
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         trailing: Text(
                           formatter.format(totalPedido),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16.0,
-                            color: Colors.green,
+                            color: Colors.deepOrange, // Mudado para cor do tema
                           ),
                         ),
                         onTap: () {
-                          // Lógica de navegação será adicionada aqui.
+                          // Navegação para a tela de edição
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -125,7 +165,7 @@ class _EditarPedidosScreenState extends State<EditarPedidosScreen> {
                                 pedidoId: pedido['id'],
                               ),
                             ),
-                          );
+                          ).then((_) => _fetchPedidos()); // Recarrega os pedidos ao voltar
                         },
                       ),
                     );

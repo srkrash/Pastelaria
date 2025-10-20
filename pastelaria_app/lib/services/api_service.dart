@@ -21,17 +21,20 @@ class ApiService {
     }
   }
 
-Future<dynamic> getPedidoPorId(int idPedido) async {
+Future<Map<String, dynamic>> getPedidoPorId(int idPedido) async {
     final url = Uri.parse('$baseUrl/pedidos/$idPedido');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
+        return json.decode(response.body) as Map<String, dynamic>;
+      } else if (response.statusCode == 404) {
+         throw Exception('Pedido não encontrado.');
+      }
+      else {
         throw Exception('Falha ao carregar o pedido: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Erro ao conectar com a API: $e');
+      rethrow; 
     }
   }
 
@@ -107,26 +110,55 @@ Future<dynamic> getPedidoPorId(int idPedido) async {
             'Falha ao carregar produtos: Status Code ${response.statusCode}');
       }
     } catch (e) {
-      // Captura e lança exceções de rede ou outras.
-      print('Erro ao buscar produtos: $e');
       rethrow;
     }
   }
 
-  Future<void> updatePedido(int pedidoId, Map<String, dynamic> dadosPedido) async {
-    final url = Uri.parse('$baseUrl/pedidos/$pedidoId');
+  Future<bool> updatePedidoStatus(int pedidoId, String newStatus) async {
+    final url = Uri.parse('$baseUrl/pedidos/$pedidoId/status');
+    
+    final body = json.encode({
+      'status': newStatus,
+    });
+
     try {
-      final response = await http.put(
+      final response = await http.patch(
         url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(dadosPedido),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: body,
       );
-      if (response.statusCode != 200) {
-        // Se a API retornar um erro, lança uma exceção com o corpo da resposta
-        throw Exception('Falha ao atualizar pedido: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        String errorMessage = 'Falha na atualização do status.';
+        try {
+          final errorData = json.decode(response.body);
+          errorMessage = errorData['erro'] ?? errorMessage;
+        } catch (_) {}
+        
+        throw Exception(errorMessage);
       }
     } catch (e) {
-      throw Exception('Erro ao atualizar pedido: $e');
+      throw Exception('Erro ao conectar com o servidor para atualizar status: $e');
+    }
+  }
+
+  Future<List<dynamic>> getFilaEntrega() async {
+    final url = Uri.parse('$baseUrl/fila_entrega'); // Assumindo o endpoint Flask: /fila_entrega
+    try {
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        // A API deve retornar uma lista de pedidos (Map)
+        return json.decode(response.body) as List<dynamic>; 
+      } else {
+        throw Exception('Falha ao carregar a fila de entrega: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erro de conexão ao buscar fila de entrega: $e');
     }
   }
 

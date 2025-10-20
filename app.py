@@ -93,7 +93,7 @@ def get_pedido_detalhes(pedido_id):
 
     try:
         cur.execute(
-            "SELECT numero_pedido, data_hora_pedido, observacoes, total_pedido FROM pedidos WHERE id = %s;", (pedido_id,))
+            "SELECT id, numero_pedido, data_hora_pedido, observacoes, total_pedido, status FROM pedidos WHERE id = %s;", (pedido_id,))
         pedido = cur.fetchone()
 
         if not pedido:
@@ -109,6 +109,8 @@ def get_pedido_detalhes(pedido_id):
                 ip.quantidade,
                 ip.observacoes_item,
                 ip.status_item,
+                ip.preco_unitario,
+                ip.subtotal,
                 p.nome AS produto_nome,
                 p.tipo AS produto_tipo
             FROM itens_pedido ip
@@ -217,14 +219,15 @@ def criar_pedido():
                         preco_final_item = 15.00
                         is_special = True
                         break
-    
+
                 # Se não for um pastel especial, aplica a lógica de precificação por ingredientes
                 if not is_special:
                     num_ingredientes = len(ingredientes_pagos)
                     if num_ingredientes <= 2:
                         preco_final_item = 12.00
                     else:
-                        preco_final_item = 12.00 + (num_ingredientes - 2) * 3.00
+                        preco_final_item = 12.00 + \
+                            (num_ingredientes - 2) * 3.00
 
             subtotal_item = preco_final_item * quantidade_item
             total_pedido += subtotal_item
@@ -450,51 +453,107 @@ def atualizar_status_item(item_id):
     }), 200
 
 
-@app.route('/pedidos/<int:pedido_id>', methods=['PUT'])
-def atualizar_pedido(pedido_id):
+@app.route('/pedidos/<int:pedido_id>/status', methods=['PATCH'])
+def update_pedido_status(pedido_id):
+
+    # 1. Conexão e Dados
     conn = get_db_connection()
     cur = conn.cursor()
     data = request.get_json()
+    new_status = data.get('status')
+
+    # 2. Validação
+    if not new_status or new_status not in ['fechado', 'cancelado']:
+        return jsonify({"erro": "Status inválido. Deve ser 'fechado' ou 'cancelado'."}), 400
 
     try:
-        # Atualiza o pedido principal com observações e total_pedido
+        # 3. Atualização no Banco de Dados
         cur.execute("""
             UPDATE pedidos
-            SET observacoes = %s, total_pedido = %s
+            SET status = %s
             WHERE id = %s;
-        """, (data.get('observacoes'), data.get('total_pedido'), pedido_id))
+        """, (new_status, pedido_id))
 
-        # Deleta itens que foram removidos
-        itens_para_remover = data.get('itens_para_remover', [])
-        for item_id in itens_para_remover:
-            cur.execute("DELETE FROM itens_pedido WHERE id = %s;", (item_id,))
-        
-        # Atualiza a quantidade e observações de itens existentes
-        itens_para_atualizar = data.get('itens_para_atualizar', [])
-        for item in itens_para_atualizar:
-            cur.execute("""
-                UPDATE itens_pedido
-                SET quantidade = %s, observacoes_item = %s
-                WHERE id = %s;
-            """, (item.get('quantidade'), item.get('observacoes_item'), item.get('id')))
+        if cur.rowcount == 0:
+            conn.rollback()
+            return jsonify({"erro": "Pedido não encontrado ou status inalterado."}), 404
 
-        # Adiciona novos itens ao pedido
-        itens_para_adicionar = data.get('itens_para_adicionar', [])
-        for item in itens_para_adicionar:
-            cur.execute("""
-                INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, observacoes_item, status_item, preco)
-                VALUES (%s, %s, %s, %s, %s, %s);
-            """, (pedido_id, item.get('produto_id'), item.get('quantidade'), item.get('observacoes_item'), item.get('status_item'), item.get('preco')))
-            
         conn.commit()
-        return jsonify({"mensagem": "Pedido atualizado com sucesso!"}), 200
+        return jsonify({"mensagem": f"Status do pedido {pedido_id} atualizado para {new_status}."}), 200
 
     except Exception as e:
         conn.rollback()
+        # Loga o erro, se necessário
         return jsonify({"erro": str(e)}), 500
     finally:
         cur.close()
         conn.close()
+
+
+@app.route('/fila_entrega', methods=['GET'])
+def get_fila_entrega():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
+    SQL_FILA_ENTREGA = """
+        SELECT
+            p.id AS pedido_id,
+            p.numero_pedido,
+            p.data_hora_pedido,
+            p.observacoes,
+            p.total_pedido,
+            p.status,
+            COALESCE(
+                json_agg(
+                    json_build_object(
+                        'item_id', ip.id,
+                        'quantidade', ip.quantidade,
+                        'preco_unitario', ip.preco_unitario,
+                        'subtotal', ip.subtotal,
+                        'status_item', ip.status_item,
+                        'observacoes_item', ip.observacoes_item,
+                        'produto_nome', prod.nome,
+                        -- NOVO: Agregação dos ingredientes para este item, usando 'past_ingredientes'
+                        'ingredientes', (
+                            SELECT 
+                                COALESCE(json_agg(ing.nome), '[]'::json)
+                            FROM 
+                                past_ingredientes pi -- Tabela AGORA correta
+                            INNER JOIN 
+                                produtos ing ON pi.ingrediente_id = ing.id
+                            WHERE 
+                                pi.item_pedido_id = ip.id -- Chave de ligação correta
+                        )
+                    )
+                ) FILTER (WHERE ip.id IS NOT NULL),
+                '[]'::json
+            ) AS itens
+        FROM
+            pedidos p
+        LEFT JOIN
+            itens_pedido ip ON p.id = ip.pedido_id
+        LEFT JOIN
+            produtos prod ON ip.produto_id = prod.id
+        WHERE
+            p.status = 'aberto'
+            and p.reset_data = CURRENT_DATE
+        GROUP BY
+            p.id
+        ORDER BY
+            p.data_hora_pedido ASC;
+    """
+    try:
+        cur.execute(SQL_FILA_ENTREGA)
+        pedidos_fila = cur.fetchall()
+        return jsonify([dict(p) for p in pedidos_fila])
+
+    except Exception as e:
+        # Lógica de tratamento de erro de DB
+        print(f"Erro ao buscar fila de entrega: {e}")
+        return jsonify({"erro": "Falha interna ao carregar a fila de entrega."}), 500
+    finally:
+        cur.close()
+        conn.close()
+
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)
