@@ -1,5 +1,6 @@
 import os
-from flask import Flask, jsonify, request
+from print import ThermalPrinter
+from flask import Flask, jsonify, request, render_template
 import psycopg2
 from psycopg2.extras import DictCursor
 from dotenv import load_dotenv
@@ -13,7 +14,20 @@ app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", )
 CORS(app)
 
+connected_clients = set()
 
+printer = ThermalPrinter('Elgin i9')
+
+@socketio.on('connect')
+def handle_connect():
+    sid = request.sid
+    connected_clients.add(sid)
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    sid = request.sid
+    connected_clients.remove(sid)
+    
 def get_db_connection():
     conn = psycopg2.connect(
         host=os.getenv('DB_HOST'),
@@ -23,7 +37,6 @@ def get_db_connection():
         port=os.getenv('DB_PORT')
     )
     return conn
-
 
 def _get_proximo_numero_pedido():
     conn = get_db_connection()
@@ -49,15 +62,19 @@ def _get_proximo_numero_pedido():
     finally:
         cur.close()
         conn.close()
-    print(f'proximo numero: {proximo_numero}')
     return proximo_numero
 
+def _print_pedido(pedido):
+    try:
+        printer.print_string(printer.gerar_string_impressao_48col(pedido), f'PEDIDO #{pedido["numero_pedido"]}')
+    except Exception as e:
+        print(f"Erro ao imprimir pedido: {e}")
 
 @app.route('/')
 def home():
     socketio.emit('my_response', {'data': 'Hello, World!'})
-    return "Servidor Rodando!"
-
+    textEmit = 'Servidor Rodando!<br><br>Clientes atuais: <br>' + '<br>'.join(connected_clients)
+    return textEmit
 
 @app.route('/produtos', methods=['GET'])
 def get_produtos():
@@ -82,7 +99,6 @@ def get_produtos():
             p['preco'] = float(p['preco'])
 
     return jsonify([dict(p) for p in produtos])
-
 
 @app.route('/pedidos/<int:pedido_id>', methods=['GET'])
 def get_pedido_detalhes(pedido_id):
@@ -146,7 +162,6 @@ def get_pedido_detalhes(pedido_id):
 
     return jsonify(pedido_detalhes)
 
-
 @app.route('/pedidos', methods=['POST'])
 def criar_pedido():
     conn = get_db_connection()
@@ -164,7 +179,6 @@ def criar_pedido():
 
         # 2. Obter os dados principais do pedido
         observacoes_pedido = data.get('observacoes_pedido', '')
-        print(data)
         # 3. Inserir o pedido principal com o total inicial de 0.00
         cur.execute("""
             INSERT INTO pedidos (numero_pedido, observacoes, total_pedido)
@@ -231,7 +245,6 @@ def criar_pedido():
 
             subtotal_item = preco_final_item * quantidade_item
             total_pedido += subtotal_item
-            print(f'total pedido:{total_pedido}')
             # Inserir item do pedido
             cur.execute("""
                 INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco_unitario, subtotal, observacoes_item)
@@ -239,7 +252,6 @@ def criar_pedido():
             """, (pedido_id, produto_id, quantidade_item, preco_final_item, subtotal_item, observacoes_item))
 
             item_info = cur.fetchone()
-            print(item_info)
             item_pedido_id = item_info['id']  # type: ignore
             status_item = item_info['status_item']  # type: ignore
 
@@ -281,6 +293,10 @@ def criar_pedido():
 
         socketio.emit('novo_pedido', novo_pedido_detalhes)
 
+        _print_pedido(novo_pedido_detalhes)
+
+
+
     except Exception as e:
         conn.rollback()  # Reverte todas as inserções em caso de erro
         return jsonify({"erro": str(e)}), 500
@@ -289,7 +305,6 @@ def criar_pedido():
         conn.close()
 
     return jsonify({"mensagem": "Pedido criado com sucesso.", "numero_pedido": proximo_numero, "total_pedido": total_pedido}), 201
-
 
 @app.route('/pedidos/itens', methods=['GET'])
 def get_itens_pedido():
@@ -358,7 +373,6 @@ def get_itens_pedido():
 
     return jsonify(lista_final)
 
-
 @app.route('/pedidos/hoje', methods=['GET'])
 def get_pedidos_hoje():
     """
@@ -389,17 +403,14 @@ def get_pedidos_hoje():
         return jsonify([dict(p) for p in pedidos])
 
     except Exception as e:
-        print(f"Erro ao buscar pedidos do dia: {e}")
         return jsonify({"error": "Erro interno do servidor"}), 500
 
     finally:
         cur.close()
         conn.close()
 
-
 STATUS_POSSIVEIS = ['aguardando', 'em_preparacao',
                     'pronto', 'entregue', 'cancelado']
-
 
 @app.route('/itens-pedido/<int:item_id>/status', methods=['PUT'])
 def atualizar_status_item(item_id):
@@ -452,7 +463,6 @@ def atualizar_status_item(item_id):
         "pedido_id": pedido_id
     }), 200
 
-
 @app.route('/pedidos/<int:pedido_id>/status', methods=['PATCH'])
 def update_pedido_status(pedido_id):
 
@@ -488,7 +498,6 @@ def update_pedido_status(pedido_id):
     finally:
         cur.close()
         conn.close()
-
 
 @app.route('/fila_entrega', methods=['GET'])
 def get_fila_entrega():
@@ -548,12 +557,13 @@ def get_fila_entrega():
 
     except Exception as e:
         # Lógica de tratamento de erro de DB
-        print(f"Erro ao buscar fila de entrega: {e}")
         return jsonify({"erro": "Falha interna ao carregar a fila de entrega."}), 500
     finally:
         cur.close()
         conn.close()
 
+def print_pedidos(pedido_data):
+    pass
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)

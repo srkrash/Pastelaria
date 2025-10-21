@@ -80,7 +80,7 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
     // Atualiza a UI após a simulação (ou sucesso da API)
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Pedido #$pedidoId atualizado para ${newStatus.toUpperCase()}!')),
+        SnackBar(content: Text('Pedido ID$pedidoId atualizado para ${newStatus.toUpperCase()}!')),
       );
       Navigator.of(context).pop(true); 
     }

@@ -4,3 +4,4 @@ Flask-CORS==4.0.1
 psycopg2==2.9.10
 python-dotenv==1.0.1
 eventlet==0.36.1
+pywin32==311
