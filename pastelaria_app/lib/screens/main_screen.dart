@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:pastelaria_app/screens/pastel_queue_screen.dart';
 import 'package:pastelaria_app/screens/pedido_screen.dart';
 import 'package:pastelaria_app/screens/fila_entrega_screen.dart';
-
+import 'package:pastelaria_app/screens/config_screen.dart';
+import 'package:pastelaria_app/screens/log_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -12,20 +13,18 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0; // Controla qual item do menu está selecionado
+  int _selectedIndex = 0;
 
-  // Lista de widgets (telas) que serão exibidos no corpo do Scaffold
   final List<Widget> _widgetOptions = <Widget>[
-    const PedidoScreen(), // Tela 'Fazer Pedido' (PDV)
-    const PastelQueueScreen(), // Tela 'Fila de Produção' (Cozinha)
-    const FilaEntregaScreen(), // Tela 'Fila de Entrega' (Expedição)
+    const PedidoScreen(),
+    const PastelQueueScreen(),
+    const FilaEntregaScreen(),
   ];
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
-    // Fecha o drawer após a seleção
     Navigator.pop(context);
   }
 
@@ -34,18 +33,17 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pastelaria App'),
-        backgroundColor: Colors.amber, // Cor temática
+        backgroundColor: Colors.amber,
       ),
-      // Corpo do aplicativo, exibe a tela selecionada
+
       body: _widgetOptions.elementAt(_selectedIndex),
+
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
           children: <Widget>[
             const DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.amber, // Cor temática
-              ),
+              decoration: BoxDecoration(color: Colors.amber),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -53,7 +51,7 @@ class _MainScreenState extends State<MainScreen> {
                   Text(
                     'Menu Principal',
                     style: TextStyle(
-                      color: Colors.black, // Alterado para preto para alto contraste
+                      color: Colors.black,
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                     ),
@@ -62,7 +60,7 @@ class _MainScreenState extends State<MainScreen> {
                   Text(
                     'Navegação',
                     style: TextStyle(
-                      color: Colors.black54, // Alterado para um cinza escuro para contraste
+                      color: Colors.black54,
                       fontSize: 14,
                     ),
                   ),
@@ -70,7 +68,8 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.add_shopping_cart, color: Colors.blueGrey),
+              leading:
+                  const Icon(Icons.add_shopping_cart, color: Colors.blueGrey),
               title: const Text('Fazer Pedido (PDV)'),
               selected: _selectedIndex == 0,
               onTap: () => _onItemTapped(0),
@@ -87,20 +86,40 @@ class _MainScreenState extends State<MainScreen> {
               selected: _selectedIndex == 2,
               onTap: () => _onItemTapped(2),
             ),
+            ListTile(
+              leading: const Icon(Icons.settings, color: Colors.blueGrey),
+              title: const Text('Configurações'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ConfigScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.bug_report, color: Colors.redAccent),
+              title: const Text('Logs do Sistema'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LogScreen()),
+                );
+              },
+            ),
             const Divider(),
-            // Adicionando um espaço para futuras opções, como relatórios
             ListTile(
               leading: const Icon(Icons.info_outline, color: Colors.grey),
               title: const Text('Sobre'),
               onTap: () {
-                // Fechar o drawer
-                Navigator.pop(context); 
-                // Exibir um diálogo simples ou navegar para uma tela de informações
+                Navigator.pop(context);
                 showDialog(
                   context: context,
                   builder: (context) => AlertDialog(
                     title: const Text('Pastelaria App'),
-                    content: const Text('Sistema de gestão de pedidos e produção. V1.0'),
+                    content: const Text(
+                        'Pastelaria da Gaucha\n\nFay Klagenberg\nVer. 1.0.0 - 17/11/2025'),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),

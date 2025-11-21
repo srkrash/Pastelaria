@@ -1,5 +1,8 @@
+import eventlet
+eventlet.monkey_patch()
 import os
-from print import ThermalPrinter
+import json
+from printer import ThermalPrinter
 from flask import Flask, jsonify, request, render_template
 import psycopg2
 from psycopg2.extras import DictCursor
@@ -11,21 +14,24 @@ from flask_cors import CORS
 load_dotenv()
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*", )
+
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 CORS(app)
 
 connected_clients = set()
 
-printer = ThermalPrinter('Elgin i9')
+printer = ThermalPrinter('TANCA TP-650')
 
 @socketio.on('connect')
 def handle_connect():
     sid = request.sid
+    print(f"Cliente conectado: {sid}")
     connected_clients.add(sid)
 
 @socketio.on('disconnect')
 def handle_disconnect():
     sid = request.sid
+    print(f"Cliente desconectado: {sid}")
     connected_clients.remove(sid)
     
 def get_db_connection():
@@ -72,7 +78,8 @@ def _print_pedido(pedido):
 
 @app.route('/')
 def home():
-    socketio.emit('my_response', {'data': 'Hello, World!'})
+    print("Rota / acessada")
+    socketio.emit('my_response', {'data': 'Hello, World!'}, namespace='/')
     textEmit = 'Servidor Rodando!<br><br>Clientes atuais: <br>' + '<br>'.join(connected_clients)
     return textEmit
 
@@ -81,6 +88,7 @@ def get_produtos():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=DictCursor)
     tipo_filtro = request.args.get('tipo')
+    print(f"Buscando produtos. Filtro: {tipo_filtro}")
     query = "SELECT id, nome, preco, tipo FROM produtos WHERE ativo = TRUE"
     params = []
 
@@ -102,6 +110,7 @@ def get_produtos():
 
 @app.route('/pedidos/<int:pedido_id>', methods=['GET'])
 def get_pedido_detalhes(pedido_id):
+    print(f"Buscando detalhes do pedido {pedido_id}")
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=DictCursor)
 
@@ -155,6 +164,7 @@ def get_pedido_detalhes(pedido_id):
             pedido_detalhes['itens'].append(item_dict)
 
     except Exception as e:
+        print(f"Erro em get_pedido_detalhes: {e}")
         return jsonify({"erro": str(e)}), 500
     finally:
         cur.close()
@@ -164,6 +174,7 @@ def get_pedido_detalhes(pedido_id):
 
 @app.route('/pedidos', methods=['POST'])
 def criar_pedido():
+    print("Recebendo solicitação de novo pedido...")
     conn = get_db_connection()
     data = request.get_json()
 
@@ -257,6 +268,7 @@ def criar_pedido():
 
             item_para_ws = {
                 'item_id': item_pedido_id,
+                'pedido_id': pedido_id, # Adiciona o ID do pedido
                 'produto_nome': produto_nome,
                 'produto_tipo': tipo_produto,
                 'quantidade': quantidade_item,
@@ -291,7 +303,10 @@ def criar_pedido():
 
         conn.commit()  # Confirma todas as inserções
 
-        socketio.emit('novo_pedido', novo_pedido_detalhes)
+        json.dumps(novo_pedido_detalhes)
+
+        print(f"Pedido criado com sucesso: #{proximo_numero}")
+        socketio.emit('novo_pedido', novo_pedido_detalhes, namespace='/')
 
         _print_pedido(novo_pedido_detalhes)
 
@@ -299,6 +314,7 @@ def criar_pedido():
 
     except Exception as e:
         conn.rollback()  # Reverte todas as inserções em caso de erro
+        print(f"Erro ao criar pedido: {e}")
         return jsonify({"erro": str(e)}), 500
     finally:
         cur.close()  # type: ignore
@@ -312,7 +328,8 @@ def get_itens_pedido():
     cur = conn.cursor(cursor_factory=DictCursor)
 
     # Parâmetros de filtro da URL
-    status_filtro = request.args.get('status_item')
+    status_filtro = request.args.getlist('status_item')
+    print(f"Buscando itens do pedido. Filtro status: {status_filtro}")
 
     # Lógica para construir a query SQL com base no filtro
     query = """
@@ -330,11 +347,12 @@ def get_itens_pedido():
         JOIN pedidos pe ON ip.pedido_id = pe.id
     """
 
+    params = ()
     if status_filtro:
-        query += " WHERE ip.status_item = %s"
-        params = (status_filtro,)
-    else:
-        params = ()
+        # Cria placeholders para o IN clause (ex: %s, %s)
+        placeholders = ', '.join(['%s'] * len(status_filtro))
+        query += f" WHERE ip.status_item IN ({placeholders})"
+        params = tuple(status_filtro)
 
     query += " ORDER BY pe.data_hora_pedido, ip.id;"
 
@@ -366,6 +384,7 @@ def get_itens_pedido():
             lista_final.append(item_dict)
 
     except Exception as e:
+        print(f"Erro em get_itens_pedido: {e}")
         return jsonify({"erro": str(e)}), 500
     finally:
         cur.close()
@@ -380,6 +399,7 @@ def get_pedidos_hoje():
     """
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=DictCursor)
+    print("Buscando pedidos de hoje...")
 
     query = """
         SELECT 
@@ -403,6 +423,7 @@ def get_pedidos_hoje():
         return jsonify([dict(p) for p in pedidos])
 
     except Exception as e:
+        print(f"Erro em get_pedidos_hoje: {e}")
         return jsonify({"error": "Erro interno do servidor"}), 500
 
     finally:
@@ -418,6 +439,7 @@ def atualizar_status_item(item_id):
     cur = conn.cursor()
     data = request.get_json()
     novo_status = data.get('status')
+    print(f"Atualizando status do item {item_id} para {novo_status}")
 
     if not novo_status:
         return jsonify({"erro": "O novo status não foi fornecido."}), 400
@@ -448,10 +470,11 @@ def atualizar_status_item(item_id):
             'item_id': item_id,
             'novo_status': novo_status,
             'pedido_id': pedido_id
-        })
+        }, namespace='/')
 
     except Exception as e:
         conn.rollback()
+        print(f"Erro em atualizar_status_item: {e}")
         return jsonify({"erro": str(e)}), 500
     finally:
         cur.close()
@@ -471,6 +494,7 @@ def update_pedido_status(pedido_id):
     cur = conn.cursor()
     data = request.get_json()
     new_status = data.get('status')
+    print(f"Atualizando status do pedido {pedido_id} para {new_status}")
 
     # 2. Validação
     if not new_status or new_status not in ['fechado', 'cancelado']:
@@ -488,12 +512,38 @@ def update_pedido_status(pedido_id):
             conn.rollback()
             return jsonify({"erro": "Pedido não encontrado ou status inalterado."}), 404
 
+        # Se o pedido for cancelado, cancela também todos os itens associados
+        if new_status == 'cancelado':
+            print(f"Cancelando todos os itens do pedido {pedido_id}...")
+            cur.execute("""
+                UPDATE itens_pedido
+                SET status_item = 'cancelado'
+                WHERE pedido_id = %s;
+            """, (pedido_id,))
+        
+        # Se o pedido for fechado, marca todos os itens como 'pronto' (se ainda não estiverem entregues/cancelados)
+        elif new_status == 'fechado':
+             print(f"Finalizando todos os itens do pedido {pedido_id}...")
+             cur.execute("""
+                UPDATE itens_pedido
+                SET status_item = 'pronto'
+                WHERE pedido_id = %s AND status_item NOT IN ('entregue', 'cancelado', 'pronto');
+            """, (pedido_id,))
+
         conn.commit()
+
+        # Notifica clientes sobre a atualização do pedido
+        socketio.emit('pedido_atualizado', {
+            'pedido_id': pedido_id,
+            'novo_status': new_status
+        }, namespace='/')
+
         return jsonify({"mensagem": f"Status do pedido {pedido_id} atualizado para {new_status}."}), 200
 
     except Exception as e:
         conn.rollback()
         # Loga o erro, se necessário
+        print(f"Erro em update_pedido_status: {e}")
         return jsonify({"erro": str(e)}), 500
     finally:
         cur.close()
@@ -503,6 +553,7 @@ def update_pedido_status(pedido_id):
 def get_fila_entrega():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=DictCursor)
+    print("Buscando fila de entrega...")
     SQL_FILA_ENTREGA = """
         SELECT
             p.id AS pedido_id,
@@ -557,6 +608,7 @@ def get_fila_entrega():
 
     except Exception as e:
         # Lógica de tratamento de erro de DB
+        print(f"Erro em get_fila_entrega: {e}")
         return jsonify({"erro": "Falha interna ao carregar a fila de entrega."}), 500
     finally:
         cur.close()
@@ -566,4 +618,5 @@ def print_pedidos(pedido_data):
     pass
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    print("Iniciando servidor Flask...")
+    socketio.run(app, host='0.0.0.0', port=5000)

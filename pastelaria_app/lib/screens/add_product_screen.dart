@@ -49,6 +49,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         itensSelecionados.add(
           ItemPedido(
             id: productId, // Usamos o ID do produto para identificação
+            pedidoId: 0, // Placeholder
             quantidade: quantidade,
             produtoNome: productName,
             statusItem: 'pronto', // Status inicial

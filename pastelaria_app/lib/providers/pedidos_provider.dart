@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../models/item_pedido.dart';
 import '../services/api_service.dart';
+import '../services/ip_storage.dart';
 
 class PedidosProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
-  late final io.Socket _socket;
+  late io.Socket _socket;
 
   List<ItemPedido> _itensPedido = [];
   List<ItemPedido> _filaPastel = [];
@@ -25,11 +26,46 @@ class PedidosProvider with ChangeNotifier {
     _listKeyEntrega = key;
   }
 
-  PedidosProvider()
-      : _socket = io.io('http://localhost:5000', <String, dynamic>{
-          'transports': <String>['websocket'],
-          'autoConnect': false,
-        }) {
+  PedidosProvider._internal();
+
+  static Future<PedidosProvider> create() async {
+    final provider = PedidosProvider._internal();
+    
+    // 3. Obtém o IP salvo (ou usa um fallback)
+    final serverIp = await IpStorage.getIp() ?? 'localhost'; 
+    final socketUrl = 'http://$serverIp:5000';
+    
+    // 4. Inicializa o socket com o IP correto
+    debugPrint('PedidosProvider: Inicializando socket em $socketUrl');
+    provider._socket = io.io(socketUrl, <String, dynamic>{
+      'transports': <String>['websocket'],
+      'autoConnect': true,
+    });
+    
+    // 5. Inicializa os ouvintes do WebSocket
+    provider._initWebSocket(); 
+    
+    return provider;
+  }
+
+  Future<void> updateConnection() async {
+    // Desconecta o socket atual se estiver conectado
+    if (_socket.connected) {
+      _socket.disconnect();
+    }
+    
+    // Obtém o novo IP
+    final serverIp = await IpStorage.getIp() ?? 'localhost';
+    final socketUrl = 'http://$serverIp:5000';
+    
+    // Reinicializa o socket com o novo URL
+    debugPrint('PedidosProvider: Reconectando socket em $socketUrl');
+    _socket = io.io(socketUrl, <String, dynamic>{
+      'transports': <String>['websocket'],
+      'autoConnect': true,
+    });
+    
+    // Reconfigura os ouvintes
     _initWebSocket();
   }
 
@@ -57,15 +93,15 @@ class PedidosProvider with ChangeNotifier {
     _socket.connect();
 
     _socket.onConnect((_) {
-      print('Conectado ao WebSocket!');
+      debugPrint('PedidosProvider: Conectado ao WebSocket!');
     });
 
     _socket.onDisconnect((_) {
-      print('Desconectado do WebSocket!');
+      debugPrint('PedidosProvider: Desconectado do WebSocket!');
     });
 
     _socket.on('novo_pedido', (data) {
-      print('Novo pedido recebido via WebSocket: $data');
+      debugPrint('PedidosProvider: Novo pedido recebido via WebSocket: $data');
       final List<dynamic> itensJson = data['itens'];
       for (var itemJson in itensJson) {
         if (itemJson['produto_tipo'] == 'pastel') {
@@ -92,14 +128,14 @@ class PedidosProvider with ChangeNotifier {
     });
 
     _socket.on('status_atualizado', (data) {
-      print('Status de item atualizado recebido via WebSocket: $data');
+      debugPrint('PedidosProvider: Status de item atualizado recebido via WebSocket: $data');
       final int itemId = data['item_id'];
       final String novoStatus = data['novo_status'];
       _updateItemStatusLocal(itemId, novoStatus);
     });
 
     _socket.on('pedido_atualizado', (data) {
-      print('Pedido com status atualizado recebido via WebSocket: $data');
+      debugPrint('PedidosProvider: Pedido com status atualizado recebido via WebSocket: $data');
       // Atualiza o pedido na lista de pedidos
       final int pedidoId = data['pedido_id'];
       final String novoStatus = data['novo_status'];
@@ -110,9 +146,11 @@ class PedidosProvider with ChangeNotifier {
   // 2. Busca inicial dos itens de pedido
   Future<void> prepareFilaPastel() async {
     try {
+      debugPrint('PedidosProvider: Buscando itens para fila de pastel...');
       // Busca itens com status 'aguardando' OU 'em_producao'
       _itensPedido =
           await _apiService.getItensPorStatus(['aguardando', 'em_producao']);
+      debugPrint('PedidosProvider: ${_itensPedido.length} itens encontrados.');
       List<ItemPedido> itensPastel = [];
       for (var item in _itensPedido) {
         // Condição atualizada para incluir todos os tipos de pastéis
@@ -121,6 +159,7 @@ class PedidosProvider with ChangeNotifier {
             // Cria um novo item para cada unidade, copiando os dados
             itensPastel.add(ItemPedido(
               id: item.id,
+              pedidoId: item.pedidoId, // Copia o pedidoId
               quantidade: 1, // Fixa a quantidade em 1
               produtoNome: item.produtoNome,
               statusItem: item.statusItem,
@@ -135,6 +174,7 @@ class PedidosProvider with ChangeNotifier {
             // Cria um novo item para cada unidade, copiando os dados
             itensPastel.add(ItemPedido(
               id: item.id,
+              pedidoId: item.pedidoId, // Copia o pedidoId
               quantidade: 1, // Fixa a quantidade em 1
               produtoNome: item.produtoNome,
               statusItem: item.statusItem,
@@ -149,14 +189,16 @@ class PedidosProvider with ChangeNotifier {
       _filaPastel = itensPastel;
       notifyListeners();
     } catch (e) {
-      print('Erro ao preparar a fila de pastéis: $e');
+      debugPrint('PedidosProvider: Erro ao preparar a fila de pastéis: $e');
     }
   }
 
   Future<void> fetchFilaEntrega() async {
     try {
+      debugPrint('PedidosProvider: Buscando fila de entrega...');
       // Presumindo que esta chamada API retorna a lista de pedidos a serem despachados
       final List<dynamic> fila = await _apiService.getFilaEntrega();
+      debugPrint('PedidosProvider: Fila de entrega carregada com ${fila.length} itens.');
 
       // Limpa a lista atual e a preenche com os dados da API
       _filaEntrega = fila;
@@ -165,7 +207,7 @@ class PedidosProvider with ChangeNotifier {
       // A tela apenas será reconstruída via notifyListeners
       notifyListeners();
     } catch (e) {
-      print('Erro ao carregar a fila de entrega: $e');
+      debugPrint('PedidosProvider: Erro ao carregar a fila de entrega: $e');
       // Trate o erro
     }
   }
@@ -178,6 +220,7 @@ class PedidosProvider with ChangeNotifier {
   Future<void> avancarFila() async {
     if (_filaPastel.isNotEmpty) {
       final itemPronto = _filaPastel.removeAt(0);
+      debugPrint('PedidosProvider: Avançando fila. Item concluído: ${itemPronto.id}');
 
       _listKeyPastel?.currentState?.removeItem(
         0,
@@ -200,6 +243,7 @@ class PedidosProvider with ChangeNotifier {
 
   Future<void> _atualizarStatusDeTodosItens(
       int itemId, String novoStatus) async {
+    debugPrint('PedidosProvider: Atualizando status do item $itemId para $novoStatus');
     // Primeiro, atualiza o status no backend
     await _apiService.atualizarStatusItem(itemId, novoStatus);
 
@@ -208,6 +252,7 @@ class PedidosProvider with ChangeNotifier {
       if (_filaPastel[i].id == itemId) {
         final itemAtualizado = ItemPedido(
           id: _filaPastel[i].id,
+          pedidoId: _filaPastel[i].pedidoId,
           quantidade: _filaPastel[i].quantidade,
           produtoNome: _filaPastel[i].produtoNome,
           statusItem: novoStatus, // Atualiza o status
@@ -237,7 +282,29 @@ class PedidosProvider with ChangeNotifier {
   }
 
   void _updatePedidoStatusLocal(int pedidoId, String novoStatus) {
-    for (int i = 0; i < _itensPedido.length; i++) {}
+    debugPrint('PedidosProvider: Atualizando status local do pedido $pedidoId para $novoStatus');
+    
+    // Se o pedido foi cancelado ou fechado, removemos todos os itens desse pedido da fila de pastéis
+    if (novoStatus == 'cancelado' || novoStatus == 'fechado') {
+      debugPrint('PedidosProvider: Iniciando remoção de itens do pedido $pedidoId (Status: $novoStatus)');
+      // Itera de trás para frente para remover itens com segurança
+      for (int i = _filaPastel.length - 1; i >= 0; i--) {
+        debugPrint('PedidosProvider: Verificando item ${_filaPastel[i].id} com pedidoId ${_filaPastel[i].pedidoId}');
+        if (_filaPastel[i].pedidoId == pedidoId) {
+          final itemRemovido = _filaPastel[i];
+          _filaPastel.removeAt(i);
+          
+          // Anima a remoção visualmente
+          _listKeyPastel?.currentState?.removeItem(
+            i,
+            (context, animation) => _buildRemovedItem(itemRemovido, animation),
+            duration: const Duration(milliseconds: 500),
+          );
+          debugPrint('PedidosProvider: Item ${itemRemovido.id} removido da fila (Pedido $novoStatus)');
+        }
+      }
+    }
+    
     notifyListeners();
   }
 
@@ -247,6 +314,7 @@ class PedidosProvider with ChangeNotifier {
       if (_filaPastel[i].id == itemId) {
         _filaPastel[i] = ItemPedido(
           id: _filaPastel[i].id,
+          pedidoId: _filaPastel[i].pedidoId,
           quantidade: _filaPastel[i].quantidade,
           produtoNome: _filaPastel[i].produtoNome,
           statusItem: novoStatus,

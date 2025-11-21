@@ -23,6 +23,11 @@ class ThermalPrinter:
     # 4. Comando para selecionar modo de impressão em negrito
     CMD_BOLD_ON = b'\x1B\x45\x01' # ESC E 1
     CMD_BOLD_OFF = b'\x1B\x45\x00' # ESC E 0
+    
+    # 5. Comandos de Tamanho
+    CMD_SIZE_2X = b'\x1D\x21\x11' # GS ! 17 (2x largura, 2x altura)
+    CMD_SIZE_NORMAL = b'\x1D\x21\x00' # GS ! 0 (Normal)
+
     LARGURA_MAX = 48
     LINHA_DIVISORA = "-" * LARGURA_MAX
     LINHA_DUPLA = "=" * LARGURA_MAX
@@ -50,15 +55,26 @@ class ThermalPrinter:
         """
         output = []
         
+        # Decodifica comandos para string para concatenar corretamente
+        bold_on = self.CMD_BOLD_ON.decode(self.CODIFICACAO)
+        bold_off = self.CMD_BOLD_OFF.decode(self.CODIFICACAO)
+        size_2x = self.CMD_SIZE_2X.decode(self.CODIFICACAO)
+        size_normal = self.CMD_SIZE_NORMAL.decode(self.CODIFICACAO)
+        
         # --- 1. CABEÇALHO ---
         
         # Centraliza o título
         titulo = "PEDIDO - PASTELARIA GAUCHA".center(self.LARGURA_MAX)
-        output.append(titulo)
+        output.append(f"{bold_on}{titulo}{bold_off}")
         output.append(self.LINHA_DUPLA)
         
         # Informações do Pedido e Data
-        output.append(f"{self.CMD_BOLD_ON}PEDIDO: {dados_pedido.get('numero_pedido', 'N/A'):<17}{self.CMD_BOLD_OFF} DATA: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        # Destaque para o Número do Pedido (Tamanho Duplo + Negrito)
+        num_pedido = dados_pedido.get('numero_pedido', 'N/A')
+        output.append(f"{size_2x}{bold_on}PEDIDO: {num_pedido}{bold_off}{size_normal}")
+        
+        # Data em linha separada (para não estourar a largura com o texto grande)
+        output.append(f"DATA: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}")
         output.append(self.LINHA_DIVISORA)
         
         # --- 2. DETALHES DOS ITENS ---
@@ -70,7 +86,7 @@ class ThermalPrinter:
         for item in dados_pedido.get('itens', []):
             quantidade = item.get('quantidade', 1)
             produto_nome = item.get('produto_nome', 'Produto Desconhecido')
-            preco_total_item = item.get('quantidade', 0) * item.get('preco', 0)
+            preco_total_item = item.get('preco', 0)
             
             # Formata o total do item
             preco_formatado = f"{preco_total_item:>.2f}".replace('.', ',')
@@ -145,17 +161,25 @@ class ThermalPrinter:
             
             try:
                 # 3. Escreve os dados
-                win32print.StartPagePrinter(hPrinter)
+                # Para impressão RAW, StartPagePrinter/EndPagePrinter muitas vezes não são necessários
+                # e podem causar "Invalid Handle" em alguns drivers.
                 win32print.WritePrinter(hPrinter, data_bytes)
-                win32print.EndPagePrinter(hPrinter)
                 
             finally:
                 # 4. Finaliza o documento
-                win32print.EndDocPrinter(hJob)
+                try:
+                    win32print.EndDocPrinter(hJob)
+                except win32api.error:
+                    # Ignora erros no fechamento se a impressão já foi enviada
+                    pass
                 
             return True
             
         except win32api.error as e:
+            # Se o erro for "Identificador inválido" (6), mas a impressão ocorreu, ignoramos.
+            if e.winerror == 6:
+                return True
+                
             print(f"Erro da API Win32 ({e.winerror}): {e.strerror}")
             print(f"Falha ao imprimir na impressora: {self.impressora}")
             return False
@@ -164,7 +188,10 @@ class ThermalPrinter:
             return False
         finally:
             if hPrinter:
-                win32print.ClosePrinter(hPrinter)
+                try:
+                    win32print.ClosePrinter(hPrinter)
+                except win32api.error:
+                    pass
 
 
     def print_string(self, texto_string, titulo_documento="Pastelaria Gaucha "):
@@ -193,29 +220,3 @@ class ThermalPrinter:
         if sucesso:
             print(f"Sucesso: O recibo foi enviado para a impressora '{self.impressora}'.")
         return sucesso
-
-if __name__ == "__main__":
-    # --- EXEMPLO DE USO ---
-
-    # ATENÇÃO: SUBSTITUA PELO NOME EXATO DA SUA ELGIN i9 NO WINDOWS
-    NOME_IMPRESSORA_ELGIN = "Elgin i9" 
-
-    # Crie uma instância da impressora
-    elgin_printer = ThermalPrinter(NOME_IMPRESSORA_ELGIN)
-
-    # Adicionando negrito manualmente (pode não funcionar dependendo do driver)
-    TEXTO_RECIBO = (
-        elgin_printer.CMD_BOLD_ON.decode(elgin_printer.CODIFICACAO, errors='ignore') + 
-        "       LOJA DE TESTES\n" + 
-        elgin_printer.CMD_BOLD_OFF.decode(elgin_printer.CODIFICACAO, errors='ignore') +
-        "--------------------------------------\n"
-        "ITEM | DESCRIÇÃO        | QTD | VALOR\n"
-        "--------------------------------------\n"
-        "01   | Cerveja Artesanal| 2   | 15,00\n"
-        "02   | Salgadinho P     | 1   |  5,50\n"
-        "--------------------------------------\n"
-        "TOTAL: R$ 35,50\n\n"
-        "     OBRIGADO E VOLTE SEMPRE!\n"
-    )
-
-    elgin_printer.print_string(TEXTO_RECIBO)

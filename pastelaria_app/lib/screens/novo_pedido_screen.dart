@@ -42,6 +42,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
       // Cria o novo item e adiciona ao pedido
       final novoItem = ItemPedido(
         id: 0,
+        pedidoId: 0, // Placeholder para novo pedido
         quantidade: quantidade,
         produtoNome: produtoNome,
         statusItem: 'aguardando',

@@ -1,21 +1,52 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:pastelaria_app/screens/main_screen.dart'; // Importe a nova tela
+import 'package:pastelaria_app/screens/main_screen.dart';
 import 'providers/pedidos_provider.dart';
+import 'package:flutter/foundation.dart';
+import 'services/log_service.dart';
 
-void main() {
-  runApp(const MyApp());
+// 1. Torne o main() assíncrono
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Intercepta TUDO que seria printado
+  debugPrint = (String? message, {int? wrapWidth}) {
+    if (message != null) {
+      logService.add(message);
+    }
+    // Continua exibindo no console normalmente
+    debugPrintSynchronously(message ?? "");
+  };
+
+  final pedidosProvider = await PedidosProvider.create();
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: logService),
+        ChangeNotifierProvider.value(value: pedidosProvider),
+      ],
+      child: MyApp(pedidosProvider: pedidosProvider),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  // 4. Recebe a instância do Provider
+  final PedidosProvider pedidosProvider;
+  
+  const MyApp({
+    super.key, 
+    required this.pedidosProvider, // Deve ser obrigatório, pois o app precisa dele
+  });
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => PedidosProvider()),
+        // 5. Usa ChangeNotifierProvider.value para fornecer o objeto existente
+        ChangeNotifierProvider.value(value: pedidosProvider),
       ],
       child: MaterialApp(
         title: 'Pastelaria App',
@@ -23,7 +54,7 @@ class MyApp extends StatelessWidget {
           primarySwatch: Colors.blue,
           visualDensity: VisualDensity.adaptivePlatformDensity,
         ),
-        home: const MainScreen(), // Defina MainScreen como a tela inicial
+        home: const MainScreen(),
       ),
     );
   }
