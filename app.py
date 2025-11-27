@@ -731,7 +731,7 @@ def get_app_version():
 
 @app.route('/download-apk', methods=['GET'])
 def download_apk():
-    apk_path = 'pastelaria_app/build/app/outputs/apk/release/app-release.apk'
+    apk_path = 'pastelaria_app/build/app/outputs/flutter-apk/app-release.apk'
     version = get_app_version()
     today = date.today().strftime('%Y-%m-%d')
     filename = f"PastelariaAPK-ver{version}-{today}.apk"
