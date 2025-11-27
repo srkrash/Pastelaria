@@ -15,10 +15,36 @@ INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Orégano', 'T
 INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Pizza', 'Pastel de presunto, queijo, tomate e orégano', 15.00, 'ingrediente', true);
 INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Misto', 'Pastel contendo todos os ingredientes', 25.00, 'ingrediente', true);
 
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Água sem gás 500ml', 'Água sem gás 500ml', 2.00, 'bebida', true);
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Água com gás 500ml', 'Água com gás 500ml', 2.00, 'bebida', true);
 
 INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Suco Natural 300ml', 'Suco Natural 300ml', 3.00, 'bebida', true);
-INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Coca-Cola Lata', 'Lata de Coca-Cola 350ml.', 5.00, 'bebida', true);
-INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Guaraná Antarctica Lata', 'Lata de Guaraná Antarctica 350ml.', 5.00, 'bebida', true);
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Suco Natural 500ml', 'Suco Natural 500ml', 5.00, 'bebida', true);
+
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Coca-Cola Lata', 'Lata de Coca-Cola 350ml.', 6.00, 'bebida', true);
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Coca-Cola Zero Lata', 'Lata de Coca-Cola Zero 350ml.', 6.00, 'bebida', true);
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Guarana Mineiro Lata', 'Lata de Guarana Mineiro 350ml.', 6.00, 'bebida', true);
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Fanta Laranja Lata', 'Lata de Fanta Laranja 350ml.', 5.00, 'bebida', true);
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Sprite Lata', 'Lata de Sprite 350ml.', 5.00, 'bebida', true);
+
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Amstel Lata', 'Lata de Amstel 269ml.', 5.00, 'bebida', true);
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Skol Lata', 'Lata de Skol 269ml.', 5.00, 'bebida', true);
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Brahma Lata', 'Lata de Brahma 269ml.', 5.00, 'bebida', true);
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Antarctica Lata', 'Lata de Antarctica 269ml.', 5.00, 'bebida', true);
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Heineken Lata', 'Lata de Heineken 269ml.', 5.00, 'bebida', true);
+
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Coca-cola 600ml', 'Pet de Coca-Cola 600ml.', 8.00, 'bebida', true);
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Mineiro 600ml', 'Pet de Mineiro 600ml.', 7.00, 'bebida', true);
+
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Coca-cola 1L', 'Pet de Coca-Cola 1L.', 10.00, 'bebida', true);
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Coca-cola zero 1L', 'Pet de Coca-Cola Zero 1L.', 10.00, 'bebida', true);
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Fanta 1L', 'Pet de Fanta 1L.', 10.00, 'bebida', true);
+
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Coca-cola 2L', 'Pet de Coca-Cola 2L.', 13.00, 'bebida', true);
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Mineiro 2L', 'Pet de Mineiro 2L.', 11.00, 'bebida', true);
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Fanta 2L', 'Pet de Fanta 2L.', 11.00, 'bebida', true);
+
+INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Energético Extra Power 473ml', 'Lata de Energético Extra Power 473ml.', 10.00, 'bebida', true);
 
 INSERT INTO produtos (nome, descricao, preco, tipo, ativo) VALUES('Pastel', 'Pastel', 0.00, 'pastel', true);
 
