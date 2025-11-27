@@ -18,6 +18,13 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
   bool _isLoading = false;
   // Instancia o serviço de API
   final ApiService _apiService = ApiService();
+  final TextEditingController _observacoesController = TextEditingController();
+
+  @override
+  void dispose() {
+    _observacoesController.dispose();
+    super.dispose();
+  }
 
   // Método para navegar e adicionar itens do pastel customizado
   void _navigateAndAddItem(BuildContext context) async {
@@ -43,6 +50,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
       final novoItem = ItemPedido(
         id: 0,
         pedidoId: 0, // Placeholder para novo pedido
+        numeroPedido: 0, // Temporário
         quantidade: quantidade,
         produtoNome: produtoNome,
         statusItem: 'aguardando',
@@ -134,6 +142,51 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
       return;
     }
 
+    // Exibe o diálogo para escolher entre Consumo ou Viagem
+    String? tipoPedido = await showDialog<String>(
+      context: context,
+      barrierDismissible: false, // Obriga o usuário a escolher
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Tipo de Pedido', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+          content: const Text('O pedido é para consumo no local ou viagem?', style: TextStyle(fontSize: 24)),
+          actions: <Widget>[
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.orange,
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+              ),
+              child: const Text('CONSUMO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+              onPressed: () {
+                Navigator.of(context).pop('Consumo');
+              },
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.blue,
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+              ),
+              child: const Text('VIAGEM', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+              onPressed: () {
+                Navigator.of(context).pop('Viagem');
+              },
+            ),
+            TextButton(
+              child: const Text('Cancelar', style: TextStyle(color: Colors.grey, fontSize: 20)),
+              onPressed: () {
+                Navigator.of(context).pop(null); // Retorna null se cancelar
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    // Se o usuário cancelou o diálogo (retornou null), não prossegue
+    if (tipoPedido == null) return;
+
     setState(() {
       _isLoading = true;
     });
@@ -153,11 +206,13 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
       };
     }).toList();
 
+    // Formata a observação com o prefixo do tipo de pedido
+    String observacoesFinais = "[$tipoPedido] ${_observacoesController.text}";
+
     // Monta o payload completo
     final pedidoPayload = {
       'valor_total': valorTotal, 
-      'observacoes_pedido':
-          '', 
+      'observacoes_pedido': observacoesFinais, 
       'itens': itensData,
     };
 
@@ -170,6 +225,10 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
             content: Text(
                 'Pedido #${response['numero_pedido']} confirmado com sucesso!')),
       );
+
+      // Atualiza o estado do último pedido no Provider
+      pedidosProvider.setUltimoPedido(
+          response['numero_pedido'], response['total_pedido']);
 
       // Limpa o pedido atual e volta para a tela anterior
       pedidosProvider.limparPedido();
@@ -193,13 +252,13 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.amber.shade700, // Cor de pastel!
         foregroundColor: const Color.fromARGB(183, 0, 0, 0),
-        padding: const EdgeInsets.symmetric(vertical: 30),
+        padding: const EdgeInsets.symmetric(vertical: 32), // Slight increase
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       child: Text(
         text, 
         textAlign: TextAlign.center, 
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold), // Slight increase
       ),
     );
   }
@@ -221,13 +280,13 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                       Navigator.of(context).pop(); // Volta para a tela de navegação
                     },
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 20),
+                padding: const EdgeInsets.symmetric(vertical: 35), // Significant increase
                 side: const BorderSide(color: Colors.red),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('Cancelar Pedido',
-                  style: TextStyle(fontSize: 18, color: Colors.red, fontWeight: FontWeight.bold)),
+                  style: TextStyle(fontSize: 28, color: Colors.red, fontWeight: FontWeight.bold)), // Significant increase
             ),
           ),
           const SizedBox(width: 16),
@@ -238,21 +297,21 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green.shade600,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 20),
+                padding: const EdgeInsets.symmetric(vertical: 35), // Significant increase
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
               child: _isLoading
                   ? const SizedBox(
-                      width: 20,
-                      height: 20,
+                      width: 30,
+                      height: 30,
                       child: CircularProgressIndicator(
                         color: Colors.white, 
-                        strokeWidth: 2
+                        strokeWidth: 3
                       ),
                     )
                   : const Text('Confirmar Pedido',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)), // Significant increase
             ),
           ),
         ],
@@ -285,7 +344,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
               children: [
                 _buildCategoryButton(
                   context,
-                  text: 'ADICIONAR PASTEL CUSTOMIZADO',
+                  text: 'Inserir Pastel', // Updated text
                   onPressed: () => _navigateAndAddItem(context),
                 ),
                 const SizedBox(height: 8.0),
@@ -294,7 +353,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                     Expanded(
                       child: _buildCategoryButton(
                         context,
-                        text: 'ADICIONAR BEBIDA',
+                        text: 'Inserir Bebida', // Updated text
                         onPressed: () => _navigateAndAddProducts(context, 'bebida'),
                       ),
                     ),
@@ -302,7 +361,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                     Expanded(
                       child: _buildCategoryButton(
                         context,
-                        text: 'ADICIONAR SALGADO',
+                        text: 'Inserir Salgado', // Updated text
                         onPressed: () => _navigateAndAddProducts(context, 'salgado'),
                       ),
                     ),
@@ -320,7 +379,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                   ? const Center(
                       child: Text(
                         'Nenhum item adicionado à comanda.', 
-                        style: TextStyle(fontSize: 18, color: Colors.blueGrey)
+                        style: TextStyle(fontSize: 24, color: Colors.blueGrey) // Increased size
                       ),
                     )
                   : ListView.builder(
@@ -334,15 +393,15 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                         final itemPrecoFormatado = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(itemPreco);
                         
                         return Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Increased vertical margin
                           decoration: BoxDecoration(
                             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
                           ),
                           child: ListTile(
-                            leading: Text('${item.quantidade}x', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            leading: Text('${item.quantidade}x', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)), // Increased size
                             title: Text(
                               item.produtoNome, 
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 26) // Increased size
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,7 +412,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                                     padding: const EdgeInsets.only(top: 4.0),
                                     child: Text(
                                       'Ingredientes: ${item.ingredientes.join(', ')}', 
-                                      style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 14)
+                                      style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 20) // Increased size
                                     ),
                                   ),
                                 // Exibe as observações
@@ -362,7 +421,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                                     padding: const EdgeInsets.only(top: 4.0),
                                     child: Text(
                                       'OBS: ${item.observacoesItem}', 
-                                      style: TextStyle(fontStyle: FontStyle.normal, fontSize: 14, color: Colors.red.shade700)
+                                      style: TextStyle(fontStyle: FontStyle.normal, fontSize: 20, color: Colors.red.shade700) // Increased size
                                     ),
                                   ),
                               ],
@@ -370,9 +429,9 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(itemPrecoFormatado, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                Text(itemPrecoFormatado, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)), // Increased size
                                 IconButton(
-                                  icon: const Icon(Icons.delete_forever, color: Colors.red),
+                                  icon: const Icon(Icons.delete_forever, color: Colors.red, size: 32), // Increased icon size
                                   onPressed: () {
                                     pedidosProvider.removerItem(item);
                                   },
@@ -403,12 +462,29 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Subtotal:', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black)),
+                const Text('Subtotal:', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black)), // Increased size
                 Text(
                   subtotalFormatado, 
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.deepOrange.shade700)
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.deepOrange.shade700) // Increased size
                 ),
               ],
+            ),
+          ),
+          
+          // Campo de Observações
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            color: Colors.white,
+            child: TextField(
+              controller: _observacoesController,
+              style: const TextStyle(fontSize: 20), // Increased input text size
+              decoration: const InputDecoration(
+                labelText: 'Observações do Pedido',
+                labelStyle: TextStyle(fontSize: 20), // Increased label size
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.note, size: 28), // Increased icon size
+              ),
+              maxLines: 2,
             ),
           ),
         ],

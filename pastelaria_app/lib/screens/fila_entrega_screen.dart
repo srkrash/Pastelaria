@@ -161,9 +161,26 @@ class _FilaEntregaScreenState extends State<FilaEntregaScreen> {
     final String observacao = pedido['observacoes']?.toString() ?? '';
     final List<dynamic> itens = pedido['itens'] ?? [];
     
-    // Define cores da fila, dando mais destaque aos pedidos mais antigos (topo)
-    final Color cardColor = index == 0 ? Colors.red.shade50 : Colors.white; 
-    final Color borderColor = index == 0 ? Colors.red.shade200 : Colors.blueGrey.shade100;
+    // Lógica de Parsing do Tipo de Pedido
+    String tipoPedido = 'CONSUMO'; // Default
+    String observacaoLimpa = observacao;
+    Color cardColor = Colors.orange.shade50;
+    Color borderColor = Colors.orange.shade200;
+    Color headerColor = Colors.deepOrange;
+
+    if (observacao.startsWith('[Viagem]')) {
+        tipoPedido = 'VIAGEM';
+        observacaoLimpa = observacao.substring(8).trim();
+        cardColor = Colors.blue.shade50;
+        borderColor = Colors.blue.shade200;
+        headerColor = Colors.blue.shade800;
+    } else if (observacao.startsWith('[Consumo]')) {
+        tipoPedido = 'CONSUMO';
+        observacaoLimpa = observacao.substring(9).trim();
+        cardColor = Colors.orange.shade50;
+        borderColor = Colors.orange.shade200;
+        headerColor = Colors.deepOrange;
+    }
 
     // 6. Aplica a animação de SLIDE no Card
     return SlideTransition(
@@ -188,23 +205,48 @@ class _FilaEntregaScreenState extends State<FilaEntregaScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Pedido #$numeroPedido (ID: $pedidoId)',
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.deepOrange),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: headerColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: headerColor.withOpacity(0.5)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '#$numeroPedido',
+                                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: headerColor),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  tipoPedido,
+                                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: headerColor),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     Text(
                       formatter.format(totalPedido),
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green),
                     ),
                   ],
                 ),
                 const Divider(),
                 
-                const Text('Conteúdo:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                const Text('Conteúdo:', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 _buildItensDetails(itens),
 
-                if (observacao.isNotEmpty) ...[
+                if (observacaoLimpa.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -214,12 +256,12 @@ class _FilaEntregaScreenState extends State<FilaEntregaScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.warning_amber_rounded, size: 18, color: Colors.amber),
+                        const Icon(Icons.warning_amber_rounded, size: 24, color: Colors.amber),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Obs. do Pedido: $observacao', 
-                            style: TextStyle(fontStyle: FontStyle.italic, color: Colors.amber.shade900)
+                            'Obs: $observacaoLimpa', 
+                            style: TextStyle(fontSize: 18, fontStyle: FontStyle.italic, color: Colors.amber.shade900)
                           ),
                         ),
                       ],
@@ -235,12 +277,12 @@ class _FilaEntregaScreenState extends State<FilaEntregaScreen> {
                   child: ElevatedButton.icon(
                     // Chama a função de despacho com os novos parâmetros
                     onPressed: () => _despacharPedido(pedidoId, index, provider),
-                    icon: const Icon(Icons.delivery_dining),
-                    label: const Text('Marcar como Despachado (Finalizar)', style: TextStyle(fontSize: 16)),
+                    icon: const Icon(Icons.delivery_dining, size: 28),
+                    label: const Text('Marcar como Despachado (Finalizar)', style: TextStyle(fontSize: 20)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade600,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                   ),

@@ -133,40 +133,49 @@ class _EditarPedidosScreenState extends State<EditarPedidosScreen> {
                     final status = pedido['status']?.toString() ?? 'desconhecido';
                     
                     return Card(
-                      elevation: 2,
-                      margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-                      child: ListTile(
-                        leading: const Icon(Icons.receipt, color: Colors.deepOrange), // Mudado para cor do tema
-                        title: Text(
-                          'Pedido Nº ${pedido['numero_pedido']}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(
-                          'Status: ${_getStatusText(status)}',
-                          style: TextStyle(
-                            color: _getStatusColor(status), // Cor baseada no status
-                            fontWeight: FontWeight.w600,
+                      elevation: 3,
+                      margin: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          leading: const Icon(Icons.receipt, color: Colors.deepOrange, size: 40), // Aumentado
+                          title: Text(
+                            'Pedido Nº ${pedido['numero_pedido']}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22), // Aumentado
                           ),
-                        ),
-                        trailing: Text(
-                          formatter.format(totalPedido),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16.0,
-                            color: Colors.deepOrange, // Mudado para cor do tema
-                          ),
-                        ),
-                        onTap: () {
-                          // Navegação para a tela de edição
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => EditarPedidoSelecionadoScreen(
-                                pedidoId: pedido['id'],
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              'Status: ${_getStatusText(status)}',
+                              style: TextStyle(
+                                color: _getStatusColor(status), // Cor baseada no status
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18, // Aumentado
                               ),
                             ),
-                          ).then((_) => _fetchPedidos()); // Recarrega os pedidos ao voltar
-                        },
+                          ),
+                          trailing: Text(
+                            formatter.format(totalPedido),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 22.0, // Aumentado
+                              color: Colors.deepOrange, // Mudado para cor do tema
+                            ),
+                          ),
+                          onTap: () {
+                            // Navegação para a tela de edição
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditarPedidoSelecionadoScreen(
+                                  pedidoId: pedido['id'],
+                                ),
+                              ),
+                            ).then((_) => _fetchPedidos()); // Recarrega os pedidos ao voltar
+                          },
+                        ),
                       ),
                     );
                   },

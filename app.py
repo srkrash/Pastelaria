@@ -3,7 +3,7 @@ eventlet.monkey_patch()
 import os
 import json
 from printer import ThermalPrinter
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, send_file
 import psycopg2
 from psycopg2.extras import DictCursor
 from dotenv import load_dotenv
@@ -44,7 +44,7 @@ def get_db_connection():
     )
     return conn
 
-def _get_proximo_numero_pedido():
+def _get_proximo_numero_pedido(tem_pastel=True):
     conn = get_db_connection()
     cur = conn.cursor()
 
@@ -53,17 +53,39 @@ def _get_proximo_numero_pedido():
     data_reset = cur.fetchone()[0]  # type: ignore
 
     try:
-        # Usa SELECT FOR UPDATE para evitar que dois clientes peguem o mesmo número
-        cur.execute(
-            "SELECT numero_pedido FROM pedidos WHERE reset_data = %s ORDER BY numero_pedido DESC LIMIT 1 FOR UPDATE;", (data_reset,))
-        ultimo_numero = cur.fetchone()
+        if tem_pastel:
+            # Sequência Positiva (Com Pastel)
+            cur.execute("""
+                SELECT numero_pedido 
+                FROM pedidos 
+                WHERE reset_data = %s AND numero_pedido > 0
+                ORDER BY numero_pedido DESC 
+                LIMIT 1 FOR UPDATE;
+            """, (data_reset,))
+            ultimo_numero_row = cur.fetchone()
 
-        if ultimo_numero:
-            proximo_numero = ultimo_numero[0] + 1
+            if ultimo_numero_row:
+                proximo_numero = ultimo_numero_row[0] + 1
+            else:
+                proximo_numero = 1
+                
+            if proximo_numero % 100 == 0:
+                proximo_numero += 1
         else:
-            proximo_numero = 1
-        if proximo_numero % 100 == 0:
-            proximo_numero += 1
+            # Sequência Negativa (Sem Pastel)
+            cur.execute("""
+                SELECT numero_pedido 
+                FROM pedidos 
+                WHERE reset_data = %s AND numero_pedido < 0
+                ORDER BY numero_pedido ASC 
+                LIMIT 1 FOR UPDATE;
+            """, (data_reset,))
+            ultimo_numero_row = cur.fetchone()
+
+            if ultimo_numero_row:
+                proximo_numero = ultimo_numero_row[0] - 1
+            else:
+                proximo_numero = -1
 
     finally:
         cur.close()
@@ -108,21 +130,26 @@ def get_produtos():
 
     return jsonify([dict(p) for p in produtos])
 
-@app.route('/pedidos/<int:pedido_id>', methods=['GET'])
-def get_pedido_detalhes(pedido_id):
-    print(f"Buscando detalhes do pedido {pedido_id}")
+def _fetch_pedido_details(pedido_id):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=DictCursor)
-
     pedido_detalhes = {}
 
     try:
-        cur.execute(
-            "SELECT id, numero_pedido, data_hora_pedido, observacoes, total_pedido, status FROM pedidos WHERE id = %s;", (pedido_id,))
+        cur.execute("""
+            SELECT 
+                id, 
+                numero_pedido, 
+                data_hora_pedido, 
+                observacoes, 
+                total_pedido, 
+                status 
+            FROM pedidos WHERE id = %s;
+        """, (pedido_id,))
         pedido = cur.fetchone()
 
         if not pedido:
-            return jsonify({"erro": "Pedido não encontrado."}), 404
+            return None
 
         pedido_detalhes = dict(pedido)
         pedido_detalhes['itens'] = []
@@ -162,15 +189,42 @@ def get_pedido_detalhes(pedido_id):
                                              for i in ingredientes]
 
             pedido_detalhes['itens'].append(item_dict)
+            
+        return pedido_detalhes
 
     except Exception as e:
-        print(f"Erro em get_pedido_detalhes: {e}")
-        return jsonify({"erro": str(e)}), 500
+        print(f"Erro em _fetch_pedido_details: {e}")
+        raise e
     finally:
         cur.close()
         conn.close()
 
-    return jsonify(pedido_detalhes)
+@app.route('/pedidos/<int:pedido_id>', methods=['GET'])
+def get_pedido_detalhes(pedido_id):
+    print(f"Buscando detalhes do pedido {pedido_id}")
+    try:
+        pedido_detalhes = _fetch_pedido_details(pedido_id)
+        if not pedido_detalhes:
+             return jsonify({"erro": "Pedido não encontrado."}), 404
+        return jsonify(pedido_detalhes)
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+@app.route('/reimprimir_pedido/<int:pedido_id>', methods=['POST'])
+def reimprimir_pedido(pedido_id):
+    print(f"Solicitação de reimpressão para o pedido {pedido_id}")
+    try:
+        pedido_detalhes = _fetch_pedido_details(pedido_id)
+        
+        if not pedido_detalhes:
+            return jsonify({"erro": "Pedido não encontrado."}), 404
+            
+        _print_pedido(pedido_detalhes)
+        return jsonify({"mensagem": f"Pedido {pedido_id} enviado para reimpressão."}), 200
+        
+    except Exception as e:
+        print(f"Erro ao reimprimir pedido: {e}")
+        return jsonify({"erro": str(e)}), 500
 
 @app.route('/pedidos', methods=['POST'])
 def criar_pedido():
@@ -185,12 +239,23 @@ def criar_pedido():
         cur = conn.cursor(cursor_factory=DictCursor)
         conn.autocommit = False  # Inicia a transação
 
-        # 1. Gerar o próximo número do pedido
-        proximo_numero = _get_proximo_numero_pedido()
+        # 1. VERIFICAÇÃO DE PASTEL (Antes de gerar o número)
+        # Verifica se existe pelo menos um item do tipo 'pastel'
+        tem_pastel = False
+        for item_data in data['itens']:
+            produto_nome = item_data['produto_nome']
+            cur.execute("SELECT tipo FROM produtos WHERE nome = %s", (produto_nome,))
+            res = cur.fetchone()
+            if res and res['tipo'] == 'pastel':
+                tem_pastel = True
+                break
 
-        # 2. Obter os dados principais do pedido
+        # 2. Gerar o próximo número do pedido com base no tipo
+        proximo_numero = _get_proximo_numero_pedido(tem_pastel)
+
+        # 3. Obter os dados principais do pedido
         observacoes_pedido = data.get('observacoes_pedido', '')
-        # 3. Inserir o pedido principal com o total inicial de 0.00
+        # 4. Inserir o pedido principal com o total inicial de 0.00
         cur.execute("""
             INSERT INTO pedidos (numero_pedido, observacoes, total_pedido)
             VALUES (%s, %s, %s) RETURNING id;
@@ -269,6 +334,7 @@ def criar_pedido():
             item_para_ws = {
                 'item_id': item_pedido_id,
                 'pedido_id': pedido_id, # Adiciona o ID do pedido
+                'numero_pedido': proximo_numero, # Adiciona o número do pedido
                 'produto_nome': produto_nome,
                 'produto_tipo': tipo_produto,
                 'quantidade': quantidade_item,
@@ -341,7 +407,8 @@ def get_itens_pedido():
             ip.status_item,
             p.nome AS produto_nome,
             p.tipo AS produto_tipo,
-            pe.numero_pedido
+            pe.numero_pedido,
+            pe.observacoes
         FROM itens_pedido ip
         JOIN produtos p ON ip.produto_id = p.id
         JOIN pedidos pe ON ip.pedido_id = pe.id
@@ -407,7 +474,8 @@ def get_pedidos_hoje():
             numero_pedido,
             status, 
             total_pedido,
-            data_hora_pedido
+            data_hora_pedido,
+            observacoes
         FROM 
             pedidos
         WHERE
@@ -549,6 +617,38 @@ def update_pedido_status(pedido_id):
         cur.close()
         conn.close()
 
+@app.route('/pedidos/<int:pedido_id>', methods=['PUT'])
+def update_pedido_observacoes(pedido_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    data = request.get_json()
+    observacoes = data.get('observacoes')
+
+    print(f"Atualizando observacoes do pedido {pedido_id}")
+
+    try:
+        cur.execute("""
+            UPDATE pedidos
+            SET observacoes = %s
+            WHERE id = %s;
+        """, (observacoes, pedido_id))
+
+        if cur.rowcount == 0:
+            conn.rollback()
+            return jsonify({"erro": "Pedido não encontrado."}), 404
+
+        conn.commit()
+
+        return jsonify({"mensagem": f"Observações do pedido {pedido_id} atualizadas."}), 200
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Erro em update_pedido_observacoes: {e}")
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
 @app.route('/fila_entrega', methods=['GET'])
 def get_fila_entrega():
     conn = get_db_connection()
@@ -596,6 +696,7 @@ def get_fila_entrega():
         WHERE
             p.status = 'aberto'
             and p.reset_data = CURRENT_DATE
+            and p.numero_pedido > 0 -- FILTRA PEDIDOS SEM PASTEL (NEGATIVOS)
         GROUP BY
             p.id
         ORDER BY
@@ -616,6 +717,30 @@ def get_fila_entrega():
 
 def print_pedidos(pedido_data):
     pass
+
+def get_app_version():
+    try:
+        with open('pastelaria_app/pubspec.yaml', 'r') as f:
+            for line in f:
+                if line.strip().startswith('version:'):
+                    return line.split(':')[1].strip()
+    except Exception as e:
+        print(f"Erro ao ler versão: {e}")
+        return "1.0.0"
+    return "1.0.0"
+
+@app.route('/download-apk', methods=['GET'])
+def download_apk():
+    apk_path = 'pastelaria_app/build/app/outputs/apk/release/app-release.apk'
+    version = get_app_version()
+    today = date.today().strftime('%Y-%m-%d')
+    filename = f"PastelariaAPK-ver{version}-{today}.apk"
+    
+    try:
+        return send_file(apk_path, as_attachment=True, download_name=filename)
+    except Exception as e:
+        print(f"Erro ao baixar APK: {e}")
+        return jsonify({"erro": "Arquivo não encontrado ou erro no servidor."}), 404
 
 if __name__ == '__main__':
     print("Iniciando servidor Flask...")

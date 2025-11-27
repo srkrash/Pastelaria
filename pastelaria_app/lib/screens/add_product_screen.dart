@@ -50,6 +50,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ItemPedido(
             id: productId, // Usamos o ID do produto para identificação
             pedidoId: 0, // Placeholder
+            numeroPedido: 0, // Temporário
             quantidade: quantidade,
             produtoNome: productName,
             statusItem: 'pronto', // Status inicial
@@ -99,29 +100,52 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     final int quantidade = _quantidades[idProduto] ?? 0;
                     final double preco = (product['preco'] as num? ?? 0.0).toDouble();
                     
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      title: Text(product['nome'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                      subtitle: Text('R\$${preco.toStringAsFixed(2)}'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Botão de remover (desabilitado se a quantidade for 0)
-                          IconButton(
-                            icon: Icon(Icons.remove_circle, color: quantidade > 0 ? Colors.deepOrange : Colors.grey.shade400),
-                            onPressed: quantidade > 0 ? () => _removerItem(idProduto) : null,
-                          ),
-                          Container(
-                            width: 30,
-                            alignment: Alignment.center,
-                            child: Text('$quantidade', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                          ),
-                          // Botão de adicionar
-                          IconButton(
-                            icon: const Icon(Icons.add_circle, color: Colors.deepOrange),
-                            onPressed: () => _adicionarItem(idProduto),
-                          ),
-                        ],
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    product['nome'], 
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24)
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'R\$${preco.toStringAsFixed(2)}', 
+                                    style: TextStyle(fontSize: 20, color: Colors.grey.shade700, fontWeight: FontWeight.w500)
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Botão de remover (desabilitado se a quantidade for 0)
+                                IconButton(
+                                  icon: Icon(Icons.remove_circle, size: 40, color: quantidade > 0 ? Colors.deepOrange : Colors.grey.shade300),
+                                  onPressed: quantidade > 0 ? () => _removerItem(idProduto) : null,
+                                ),
+                                Container(
+                                  width: 50,
+                                  alignment: Alignment.center,
+                                  child: Text('$quantidade', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                                ),
+                                // Botão de adicionar
+                                IconButton(
+                                  icon: const Icon(Icons.add_circle, size: 40, color: Colors.deepOrange),
+                                  onPressed: () => _adicionarItem(idProduto),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -134,12 +158,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   // Botão só é clicável se houver itens selecionados
                   onPressed: hasSelectedItems ? () => _confirmarSelecao(products) : null,
                   style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
+                    minimumSize: const Size.fromHeight(60),
                     backgroundColor: Colors.deepOrange,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    textStyle: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                   child: const Text('Adicionar ao Pedido'),
                 ),

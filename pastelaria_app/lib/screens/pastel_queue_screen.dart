@@ -89,7 +89,7 @@ class _PastelQueueScreenState extends State<PastelQueueScreen> {
             builder: (context, pedidosProvider, child) {
               // ----------------------------------------------------
               // Se a lista estiver vazia, exibe uma mensagem centralizada
-              if (pedidosProvider.filaPastel.isEmpty && pedidosProvider.filaPastel.length == 0) {
+              if (pedidosProvider.filaPastel.isEmpty && pedidosProvider.filaPastel.isEmpty) {
                  return const Center(
                    child: Column(
                      mainAxisAlignment: MainAxisAlignment.center,
@@ -220,18 +220,18 @@ class _PastelQueueScreenState extends State<PastelQueueScreen> {
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'ID do Item', // Rastreamento do banco de dados
+                      'Pedido Nº', // Mostra o número do pedido
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey,
                       ),
                     ),
                     Text(
-                      '#${item.id}',
+                      '#${item.numeroPedido}',
                       style: const TextStyle(
-                        fontSize: 16, 
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black54
+                        fontSize: 20, // Aumentado para destaque
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87
                       ),
                     ),
                   ],

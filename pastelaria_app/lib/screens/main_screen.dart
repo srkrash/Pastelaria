@@ -119,7 +119,7 @@ class _MainScreenState extends State<MainScreen> {
                   builder: (context) => AlertDialog(
                     title: const Text('Pastelaria App'),
                     content: const Text(
-                        'Pastelaria da Gaucha\n\nFay Klagenberg\nVer. 1.0.0 - 17/11/2025'),
+                        'Pastelaria da Gaucha\n\nFay Klagenberg\nVer. 1.0.4 - 27/11/2025'),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),

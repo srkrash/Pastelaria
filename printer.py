@@ -70,8 +70,16 @@ class ThermalPrinter:
         
         # Informações do Pedido e Data
         # Destaque para o Número do Pedido (Tamanho Duplo + Negrito)
-        num_pedido = dados_pedido.get('numero_pedido', 'N/A')
-        output.append(f"{size_2x}{bold_on}PEDIDO: {num_pedido}{bold_off}{size_normal}")
+        # Informações do Pedido e Data
+        # Destaque para o Número do Pedido (Tamanho Duplo + Negrito)
+        num_pedido = dados_pedido.get('numero_pedido', 0)
+        
+        # Se o número for negativo, significa que é um pedido sem pastel (apenas bebida/salgado)
+        # O usuário pediu para não aparecer o número do pedido.
+        if isinstance(num_pedido, int) and num_pedido < 0:
+             output.append(f"{bold_on}PEDIDO: BALCAO (SEM PASTEL){bold_off}")
+        else:
+             output.append(f"{size_2x}{bold_on}PEDIDO: {num_pedido}{bold_off}{size_normal}")
         
         # Data em linha separada (para não estourar a largura com o texto grande)
         output.append(f"DATA: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}")

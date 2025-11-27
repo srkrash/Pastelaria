@@ -89,6 +89,18 @@ class PedidosProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // Estado para armazenar o último pedido confirmado
+  Map<String, dynamic>? _ultimoPedidoConfirmado;
+  Map<String, dynamic>? get ultimoPedidoConfirmado => _ultimoPedidoConfirmado;
+
+  void setUltimoPedido(int numero, double total) {
+    _ultimoPedidoConfirmado = {
+      'numero': numero,
+      'total': total,
+    };
+    notifyListeners();
+  }
+
   void _initWebSocket() {
     _socket.connect();
 
@@ -120,8 +132,17 @@ class PedidosProvider with ChangeNotifier {
         }
       }
       final int newIndex = _filaEntrega.length;
-      _filaEntrega.add(data);
-      _listKeyEntrega?.currentState?.insertItem(newIndex, duration: const Duration(milliseconds: 500));
+      
+      // Verifica se o pedido tem número positivo (tem pastel).
+      // Se for negativo, não adiciona na fila de entrega.
+      final int numeroPedido = data['numero_pedido'] ?? 0;
+      
+      if (numeroPedido > 0) {
+        _filaEntrega.add(data);
+        _listKeyEntrega?.currentState?.insertItem(newIndex, duration: const Duration(milliseconds: 500));
+      } else {
+        debugPrint('PedidosProvider: Pedido #$numeroPedido ignorado na fila de entrega (Sem Pastel).');
+      }
 
       // A chamada notifyListeners é importante para que o estado seja atualizado.
       notifyListeners();
@@ -160,6 +181,7 @@ class PedidosProvider with ChangeNotifier {
             itensPastel.add(ItemPedido(
               id: item.id,
               pedidoId: item.pedidoId, // Copia o pedidoId
+              numeroPedido: item.numeroPedido,
               quantidade: 1, // Fixa a quantidade em 1
               produtoNome: item.produtoNome,
               statusItem: item.statusItem,
@@ -175,6 +197,7 @@ class PedidosProvider with ChangeNotifier {
             itensPastel.add(ItemPedido(
               id: item.id,
               pedidoId: item.pedidoId, // Copia o pedidoId
+              numeroPedido: item.numeroPedido,
               quantidade: 1, // Fixa a quantidade em 1
               produtoNome: item.produtoNome,
               statusItem: item.statusItem,
@@ -253,6 +276,7 @@ class PedidosProvider with ChangeNotifier {
         final itemAtualizado = ItemPedido(
           id: _filaPastel[i].id,
           pedidoId: _filaPastel[i].pedidoId,
+          numeroPedido: _filaPastel[i].numeroPedido,
           quantidade: _filaPastel[i].quantidade,
           produtoNome: _filaPastel[i].produtoNome,
           statusItem: novoStatus, // Atualiza o status
@@ -303,9 +327,37 @@ class PedidosProvider with ChangeNotifier {
           debugPrint('PedidosProvider: Item ${itemRemovido.id} removido da fila (Pedido $novoStatus)');
         }
       }
+
+      // REMOÇÃO DA FILA DE ENTREGA
+      for (int i = _filaEntrega.length - 1; i >= 0; i--) {
+        final pId = int.tryParse(_filaEntrega[i]['pedido_id']?.toString() ?? '0') ?? 0;
+         if (pId == pedidoId) {
+            final pedidoRemovido = _filaEntrega[i];
+            _filaEntrega.removeAt(i);
+             _listKeyEntrega?.currentState?.removeItem(
+                i,
+            (context, animation) => _buildRemovedPedidoEntrega(pedidoRemovido, animation),
+            duration: const Duration(milliseconds: 500),
+          );
+          debugPrint('PedidosProvider: Pedido $pedidoId removido da fila de entrega (Status: $novoStatus)');
+         }
+      }
     }
     
     notifyListeners();
+  }
+
+  Widget _buildRemovedPedidoEntrega(dynamic pedido, Animation<double> animation) {
+     return SizeTransition(
+      sizeFactor: animation,
+      axis: Axis.vertical, 
+      child: Card(
+        color: Colors.red.shade50,
+        child: ListTile(
+          title: Text('Removendo Pedido #${pedido['numero_pedido']}', style: const TextStyle(color: Colors.red)),
+        ),
+      ),
+    );
   }
 
   void _updateItemStatusLocal(int itemId, String novoStatus) {
@@ -315,6 +367,7 @@ class PedidosProvider with ChangeNotifier {
         _filaPastel[i] = ItemPedido(
           id: _filaPastel[i].id,
           pedidoId: _filaPastel[i].pedidoId,
+          numeroPedido: _filaPastel[i].numeroPedido,
           quantidade: _filaPastel[i].quantidade,
           produtoNome: _filaPastel[i].produtoNome,
           statusItem: novoStatus,

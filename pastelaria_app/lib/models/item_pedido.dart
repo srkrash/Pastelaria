@@ -2,7 +2,8 @@
 
 class ItemPedido {
   int id;
-  int pedidoId; // Novo campo
+  int pedidoId; 
+  int numeroPedido; // Novo campo para o número do pedido
   int quantidade;
   String produtoNome;
   String statusItem;
@@ -13,6 +14,7 @@ class ItemPedido {
   ItemPedido({
     required this.id,
     required this.pedidoId,
+    required this.numeroPedido,
     required this.quantidade,
     required this.produtoNome,
     required this.statusItem,
@@ -37,6 +39,7 @@ class ItemPedido {
     // CORREÇÃO: Lida com a possibilidade de 'id' e 'quantidade' serem nulos ou outros tipos.
     final int id = (json['item_id'] as num? ?? 0).toInt();
     final int pedidoId = (json['pedido_id'] as num? ?? 0).toInt(); // Lê o pedido_id
+    final int numeroPedido = (json['numero_pedido'] as num? ?? 0).toInt(); // Lê o numero_pedido
     final int quantidade = (json['quantidade'] as num? ?? 0).toInt();
     
     // Converte a lista de ingredientes, se existir
@@ -50,6 +53,7 @@ class ItemPedido {
     return ItemPedido(
       id: id,
       pedidoId: pedidoId,
+      numeroPedido: numeroPedido,
       quantidade: quantidade,
       produtoNome: json['produto_nome'] ?? '',
       statusItem: json['status_item'] ?? '',

@@ -171,4 +171,22 @@ class ApiService {
       throw Exception('Erro de conexão ao buscar fila: $e');
     }
   }
+
+  Future<void> reimprimirPedido(int pedidoId) async {
+    final baseUrl = await _getBaseUrl();
+    final url = Uri.parse('$baseUrl/reimprimir_pedido/$pedidoId');
+    debugPrint('ApiService: POST $url');
+
+    try {
+      final response = await http.post(url);
+      debugPrint('ApiService: Response ${response.statusCode}');
+
+      if (response.statusCode != 200) {
+        throw Exception('Falha ao solicitar reimpressão: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('ApiService: Erro em reimprimirPedido: $e');
+      throw Exception('Erro ao conectar com a API: $e');
+    }
+  }
 }

@@ -93,56 +93,98 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
     // Volta para a tela anterior, ativando a recarga em EditarPedidosScreen
   }
 
+  void _reimprimirPedido(int pedidoId) async {
+    try {
+      await _apiService.reimprimirPedido(pedidoId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Solicitação de reimpressão enviada!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao reimprimir: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final formatter = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Detalhes do Pedido #${widget.pedidoId}'),
-        backgroundColor: Colors.deepOrange,
-        foregroundColor: Colors.white,
-      ),
-      // FloatingActionButton foi removido.
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _pedidoFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            // Se houver erro, exibe a mensagem de erro da API
-            return Center(child: Text('Erro ao carregar detalhes do pedido: ${snapshot.error}'));
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('Detalhes do pedido não encontrados.'));
-          }
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _pedidoFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Carregando...'),
+              backgroundColor: Colors.deepOrange,
+              foregroundColor: Colors.white,
+            ),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Erro'),
+              backgroundColor: Colors.deepOrange,
+              foregroundColor: Colors.white,
+            ),
+            body: Center(child: Text('Erro ao carregar detalhes do pedido: ${snapshot.error}')),
+          );
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Não Encontrado'),
+              backgroundColor: Colors.deepOrange,
+              foregroundColor: Colors.white,
+            ),
+            body: const Center(child: Text('Detalhes do pedido não encontrados.')),
+          );
+        }
 
-          final pedido = snapshot.data!;
-          final String status = pedido['status']?.toString() ?? 'desconhecido'; 
-          final double totalPedido = double.tryParse(pedido['total_pedido']?.toString() ?? '0.0') ?? 0.0;
-          final List<dynamic> itens = pedido['itens'] ?? [];
-          // Usando 'observacoes' conforme o endpoint do Flask
-          final String observacao = pedido['observacoes']?.toString() ?? ''; 
+        final pedido = snapshot.data!;
+        final String status = pedido['status']?.toString() ?? 'desconhecido';
+        final double totalPedido = double.tryParse(pedido['total_pedido']?.toString() ?? '0.0') ?? 0.0;
+        final List<dynamic> itens = pedido['itens'] ?? [];
+        final String observacao = pedido['observacoes']?.toString() ?? '';
+        final int numeroPedido = pedido['numero_pedido'] as int? ?? 0;
 
-          return Column(
+        return Scaffold(
+          appBar: AppBar(
+            title: Text('Pedido #$numeroPedido'),
+            backgroundColor: Colors.deepOrange,
+            foregroundColor: Colors.white,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.print),
+                onPressed: () => _reimprimirPedido(widget.pedidoId),
+                tooltip: 'Reimprimir Pedido',
+              ),
+            ],
+          ),
+          body: Column(
             children: [
               // HEADER: Status e Total
               Container(
-                padding: const EdgeInsets.all(16.0),
-                // Cor de fundo levemente amarela para destaque, seguindo o tema pastel
-                color: Colors.amber.shade50, 
+                padding: const EdgeInsets.all(24.0),
+                color: Colors.amber.shade50,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Status Atual:', style: TextStyle(fontSize: 14, color: Colors.blueGrey)),
+                        const Text('Status Atual:', style: TextStyle(fontSize: 18, color: Colors.blueGrey)),
                         Text(
                           _getStatusText(status),
                           style: TextStyle(
-                            fontSize: 24,
+                            fontSize: 32,
                             fontWeight: FontWeight.bold,
                             color: _getStatusColor(status),
                           ),
@@ -152,11 +194,11 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Text('Total do Pedido:', style: TextStyle(fontSize: 14, color: Colors.blueGrey)),
+                        const Text('Total do Pedido:', style: TextStyle(fontSize: 18, color: Colors.blueGrey)),
                         Text(
                           formatter.format(totalPedido),
                           style: const TextStyle(
-                            fontSize: 24,
+                            fontSize: 32,
                             fontWeight: FontWeight.bold,
                             color: Colors.deepOrange,
                           ),
@@ -170,26 +212,26 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
               // Observações do Pedido (se houver)
               if (observacao.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
                   child: Row(
                     children: [
-                      const Icon(Icons.info_outline, color: Colors.blueGrey, size: 20),
-                      const SizedBox(width: 8),
+                      const Icon(Icons.info_outline, color: Colors.blueGrey, size: 28),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Obs. Pedido: $observacao',
-                          style: TextStyle(fontStyle: FontStyle.italic, color: Colors.blueGrey.shade700),
+                          style: TextStyle(fontStyle: FontStyle.italic, color: Colors.blueGrey.shade700, fontSize: 20),
                         ),
                       ),
                     ],
                   ),
                 ),
-                
+
               const Divider(height: 1),
-              
+
               const Padding(
-                padding: EdgeInsets.all(12.0),
-                child: Text('Itens do Pedido:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                padding: EdgeInsets.all(16.0),
+                child: Text('Itens do Pedido:', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               ),
 
               // Lista de Itens
@@ -198,58 +240,58 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
                   itemCount: itens.length,
                   itemBuilder: (context, index) {
                     final item = itens[index];
-                    final String produtoNome = item['produto_nome']?.toString() ?? 'Produto Desconhecido'; 
+                    final String produtoNome = item['produto_nome']?.toString() ?? 'Produto Desconhecido';
                     final int quantidade = item['quantidade'] as int? ?? 0;
-                    
-                    // Utilizando as novas chaves do endpoint:
+
                     final double precoUnitario = double.tryParse(item['preco_unitario']?.toString() ?? '0.0') ?? 0.0;
-                    final double subtotal = double.tryParse(item['subtotal']?.toString() ?? '0.0') ?? 0.0; 
+                    final double subtotal = double.tryParse(item['subtotal']?.toString() ?? '0.0') ?? 0.0;
                     final List<String> ingredientes = (item['ingredientes'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
                     final String observacaoItem = item['observacoes_item']?.toString() ?? '';
                     final String statusItem = item['status_item']?.toString() ?? 'aguardando';
 
                     String subtitleText = 'Preço Unit.: ${formatter.format(precoUnitario)}';
                     if (ingredientes.isNotEmpty) {
-                        subtitleText += '\nIngredientes: ${ingredientes.join(', ')}';
+                      subtitleText += '\nIngredientes: ${ingredientes.join(', ')}';
                     }
                     if (observacaoItem.isNotEmpty) {
-                        subtitleText += '\nObs. Item: $observacaoItem';
+                      subtitleText += '\nObs. Item: $observacaoItem';
                     }
-                    
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.deepOrange.shade100,
-                        child: Text('${quantidade}x', style: const TextStyle(color: Colors.deepOrange)),
-                      ),
-                      title: Text(produtoNome, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(subtitleText, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                          const SizedBox(height: 4),
-                          // Exibe o status individual do item
-                          Text(
-                            _getStatusText(statusItem),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: _getStatusColor(statusItem),
-                            ),
+
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      elevation: 2,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            radius: 25,
+                            backgroundColor: Colors.deepOrange.shade100,
+                            child: Text('${quantidade}x', style: const TextStyle(color: Colors.deepOrange, fontSize: 20, fontWeight: FontWeight.bold)),
                           ),
-                        ],
-                      ),
-                      trailing: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text('Subtotal:', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                          Text(
-                            formatter.format(subtotal), 
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+                          title: Text(produtoNome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Text(subtitleText, style: TextStyle(fontSize: 18, color: Colors.grey.shade700)),
+                              const SizedBox(height: 8),
+                              Text(
+                                _getStatusText(statusItem),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: _getStatusColor(statusItem),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                          trailing: Text(
+                            formatter.format(subtotal),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)
+                          ),
+                          isThreeLine: true,
+                        ),
                       ),
-                      isThreeLine: ingredientes.isNotEmpty || observacaoItem.isNotEmpty,
                     );
                   },
                 ),
@@ -258,7 +300,7 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
               // FOOTER: Botões de Ação (Apenas se o status for 'aberto')
               if (status == 'aberto')
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(24.0),
                   child: Row(
                     children: [
                       // Botão Cancelar
@@ -268,13 +310,13 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red.shade700,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 15),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 25),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          child: const Text('Cancelar Pedido', style: TextStyle(fontSize: 18)),
+                          child: const Text('Cancelar Pedido', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 24),
                       // Botão Finalizar
                       Expanded(
                         child: ElevatedButton(
@@ -282,19 +324,19 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green.shade700,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 15),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 25),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          child: const Text('Finalizar Pedido', style: TextStyle(fontSize: 18)),
+                          child: const Text('Finalizar Pedido', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],
                   ),
                 ),
             ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }
