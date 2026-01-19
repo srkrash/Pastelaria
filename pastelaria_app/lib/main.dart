@@ -5,12 +5,10 @@ import 'package:pastelaria_app/screens/main_screen.dart';
 import 'providers/pedidos_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'services/log_service.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 
 // 1. Torne o main() assíncrono
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  WakelockPlus.enable();
 
   // Intercepta TUDO que seria printado
   debugPrint = (String? message, {int? wrapWidth}) {
