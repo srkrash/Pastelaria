@@ -6,6 +6,7 @@ import 'screens/main_screen.dart';
 import 'services/app_settings.dart';
 import 'services/log_service.dart';
 import 'server/server_runtime.dart';
+import 'ui/app_ui.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,11 +34,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
         title: 'Pastelaria Gaúcha',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepOrange),
-            useMaterial3: true,
-            inputDecorationTheme:
-                const InputDecorationTheme(border: OutlineInputBorder())),
+        theme: appTheme(),
         home: MainScreen(initialRole: initialRole),
       );
 }

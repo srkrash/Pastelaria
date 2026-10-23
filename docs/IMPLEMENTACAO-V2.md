@@ -1,5 +1,7 @@
 # Versão 2 — servidor no APK
 
+**Revisão de telas 2.1.0:** navegação, atendimento, montagem, seleção de produtos, filas, consulta e configurações foram reorganizados. Veja a [análise de interface](REVISAO-DE-INTERFACE.md). A suíte agora possui 25 testes; os resultados da implementação inicial abaixo permanecem como histórico.
+
 Implementação iniciada em 23/10/2026, branch `codex/servidor-tablet`. O Git já existia; não foi reinicializado.
 
 ## Cópia de segurança antes das alterações

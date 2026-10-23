@@ -9,6 +9,7 @@ Documentação inicial em 23/10/2026, preparada para orientar o desenvolvimento 
 3. [Plano de desenvolvimento](PLANO-DE-DESENVOLVIMENTO.md): tarefas, evidências do legado e validação.
 4. [Orientações para agentes](../AGENTS.md): regras aplicáveis às alterações no repositório.
 5. [Implementação da versão 2](IMPLEMENTACAO-V2.md): ambiente, funcionalidades implementadas, instalação e limitações reais.
+6. [Revisão de interface 2.1.0](REVISAO-DE-INTERFACE.md): análise de usabilidade, melhorias aplicadas e validação das telas.
 
 ## Como interpretar
 

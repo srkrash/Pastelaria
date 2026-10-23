@@ -1,567 +1,398 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
-import 'package:pastelaria_app/providers/pedidos_provider.dart';
-import 'package:pastelaria_app/screens/add_pastel_screen.dart';
-import 'package:pastelaria_app/screens/add_product_screen.dart';
-import 'package:pastelaria_app/models/item_pedido.dart';
-import 'package:pastelaria_app/services/api_service.dart';
-import 'package:pastelaria_app/services/app_settings.dart';
-import 'dart:convert';
+import '../models/item_pedido.dart';
+import '../providers/pedidos_provider.dart';
+import '../services/api_service.dart';
+import '../services/app_settings.dart';
+import '../ui/app_ui.dart';
+import 'add_pastel_screen.dart';
+import 'add_product_screen.dart';
 
 class NovoPedidoScreen extends StatefulWidget {
-  const NovoPedidoScreen({super.key});
-
+  final ApiService? api;
+  const NovoPedidoScreen({super.key, this.api});
   @override
   State<NovoPedidoScreen> createState() => _NovoPedidoScreenState();
 }
 
 class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
-  bool _isLoading = false;
-  // Instancia o serviço de API
-  final ApiService _apiService = ApiService();
-  final TextEditingController _observacoesController = TextEditingController();
-  String? _submittedFingerprint;
+  final _notes = TextEditingController();
+  bool _busy = false;
+  String? _fingerprint;
   String _commandId = newCommandId();
+  @override
+  void initState() {
+    super.initState();
+    _notes.text = context.read<PedidosProvider>().draftNotes;
+  }
 
   @override
   void dispose() {
-    _observacoesController.dispose();
+    _notes.dispose();
     super.dispose();
   }
 
-  // Método para navegar e adicionar itens do pastel customizado
-  void _navigateAndAddItem(BuildContext context) async {
-    final PedidosProvider pedidosProvider =
-        Provider.of<PedidosProvider>(context, listen: false);
-
-    // Navega e espera o resultado da tela de adição de pastel (AddPastelScreen)
-    final resultado = await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const AddPastelScreen(),
-      ),
-    );
-
-    if (resultado != null) {
-      final quantidade = resultado['quantidade'] as int;
-      final ingredientes = resultado['ingredientes'] as List<String>;
-      final observacoes = resultado['observacoesItem'] as String;
-
-      // Nome padrão para o pastel customizado
-      String produtoNome = 'Pastel';
-
-      // Cria o novo item e adiciona ao pedido
-      final novoItem = ItemPedido(
+  Future<void> _addPastel() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+        context, MaterialPageRoute(builder: (_) => const AddPastelScreen()));
+    if (result == null || !mounted) return;
+    context.read<PedidosProvider>().adicionarItem(ItemPedido(
         id: 0,
-        pedidoId: 0, // Placeholder para novo pedido
-        numeroPedido: 0, // Temporário
-        quantidade: quantidade,
-        produtoNome: produtoNome,
+        pedidoId: 0,
+        numeroPedido: 0,
+        quantidade: result['quantidade'] as int,
+        produtoNome: 'Pastel',
         statusItem: 'aguardando',
-        // O preço é 0.0 aqui, pois será calculado dinamicamente no _calcularSubtotal
-        preco: 0.0,
-        ingredientes: ingredientes,
-        observacoesItem: observacoes,
-      );
+        preco: 0,
+        ingredientes: List<String>.from(result['ingredientes'] as List),
+        observacoesItem: result['observacoesItem'] as String));
+  }
 
-      pedidosProvider.adicionarItem(novoItem);
+  Future<void> _addProduct(String type) async {
+    final result = await Navigator.push<List<ItemPedido>>(context,
+        MaterialPageRoute(builder: (_) => AddProductScreen(productType: type)));
+    if (result == null || !mounted) return;
+    for (final item in result) {
+      context.read<PedidosProvider>().adicionarItem(item);
     }
   }
 
-  // Método para navegar e adicionar produtos simples (bebidas, salgados)
-  void _navigateAndAddProducts(BuildContext context, String productType) async {
-    final pedidosProvider =
-        Provider.of<PedidosProvider>(context, listen: false);
-
-    final resultado = await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => AddProductScreen(productType: productType),
-      ),
-    );
-
-    if (resultado != null && resultado is List<ItemPedido>) {
-      for (var item in resultado) {
-        pedidosProvider.adicionarItem(item);
-      }
+  Future<void> _discard(PedidosProvider p) async {
+    if (p.itensPedidoAtual.isEmpty) return;
+    final discard = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+                title: const Text('Limpar esta comanda?'),
+                content:
+                    const Text('Os itens ainda não enviados serão removidos.'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(c, false),
+                      child: const Text('Manter pedido')),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(c, true),
+                      child: const Text('Limpar comanda'))
+                ]));
+    if (discard == true && mounted) {
+      p.limparPedido();
+      _notes.clear();
     }
   }
 
-  // Função auxiliar para calcular o preço de um pastel específico (baseado na sua lógica)
-  double _calcularPrecoPastel(ItemPedido item) {
-    // Ingredientes gratuitos que não contam como 'extra'
-    final List<String> ingredientesGratuitos = [
-      'Cebola',
-      'Cebolinha',
-      'Orégano'
-    ];
-
-    // Caso especial 1: Pastel de Pizza (preço fixo)
-    if (item.ingredientes.length == 1 && item.ingredientes.first == 'Pizza') {
-      return 15.00 * item.quantidade;
-      // Caso especial 2: Pastel Misto (preço fixo)
-    } else if (item.ingredientes.length == 1 &&
-        item.ingredientes.first == 'Misto') {
-      return 25.00 * item.quantidade;
-    } else {
-      // Lógica para pastéis customizados.
-
-      // Filtra os ingredientes que são pagos
-      final List<String> ingredientesPagos = item.ingredientes
-          .where((ing) => !ingredientesGratuitos.contains(ing))
-          .toList();
-
-      double precoBase = 12.00; // Preço base do pastel
-      int numIngredientesPagos = ingredientesPagos.length;
-
-      // Cobra R$ 3,00 por ingrediente pago acima de 2
-      if (numIngredientesPagos > 2) {
-        precoBase += (numIngredientesPagos - 2) * 3.00;
-      }
-      return precoBase * item.quantidade;
-    }
-  }
-
-  // A função principal de cálculo do subtotal do pedido.
-  double _calcularSubtotal() {
-    double total = 0.0;
-    // Usa listen: false pois esta função é chamada dentro de build e não precisa de rebuilds internos
-    for (var item in Provider.of<PedidosProvider>(context, listen: false)
-        .itensPedidoAtual) {
-      if (item.produtoNome == 'Pastel') {
-        // Delega o cálculo do preço do pastel
-        total += _calcularPrecoPastel(item);
-      } else {
-        // Usa o preço direto para salgados e bebidas.
-        total += (item.preco) * item.quantidade;
-      }
-    }
-    return total;
-  }
-
-  // Função para confirmar o pedido usando o ApiService
-  Future<void> _confirmarPedido(PedidosProvider pedidosProvider) async {
-    if (_isLoading) return;
-    if (pedidosProvider.itensPedidoAtual.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content:
-                Text('Adicione pelo menos um item para confirmar o pedido.')),
-      );
-      return;
-    }
-
-    // Exibe o diálogo para escolher entre Consumo ou Viagem
-    String? tipoPedido = await showDialog<String>(
-      context: context,
-      barrierDismissible: false, // Obriga o usuário a escolher
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Tipo de Pedido',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-          content: const Text('O pedido é para consumo no local ou viagem?',
-              style: TextStyle(fontSize: 24)),
-          actions: <Widget>[
-            TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Colors.orange,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
-              ),
-              child: const Text('CONSUMO',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
-              onPressed: () {
-                Navigator.of(context).pop('Consumo');
-              },
-            ),
-            TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Colors.blue,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
-              ),
-              child: const Text('VIAGEM',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
-              onPressed: () {
-                Navigator.of(context).pop('Viagem');
-              },
-            ),
-            TextButton(
-              child: const Text('Cancelar',
-                  style: TextStyle(color: Colors.grey, fontSize: 20)),
-              onPressed: () {
-                Navigator.of(context).pop(null); // Retorna null se cancelar
-              },
-            ),
-          ],
-        );
-      },
-    );
-
-    // Se o usuário cancelou o diálogo (retornou null), não prossegue
-    if (tipoPedido == null) return;
-    if (!mounted) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    final double valorTotal = _calcularSubtotal();
-
-    // Mapeia os itens para o formato esperado pelo payload da API
-    final List<Map<String, dynamic>> itensData =
-        pedidosProvider.itensPedidoAtual.map((item) {
-      return {
-        'produto_nome': item.produtoNome,
-        'quantidade': item.quantidade,
-        'ingredientes': item.ingredientes
-            .map((ing) => {'nome': ing, 'quantidade': 1})
-            .toList(),
-        'observacoes_item': item.observacoesItem,
-      };
-    }).toList();
-
-    // Formata a observação com o prefixo do tipo de pedido
-    String observacoesFinais = "[$tipoPedido] ${_observacoesController.text}";
-
-    // Monta o payload completo
-    final pedidoPayload = {
-      'valor_total': valorTotal,
-      'observacoes_pedido': observacoesFinais,
-      'itens': itensData,
+  Future<void> _confirm(PedidosProvider p) async {
+    if (_busy || p.itensPedidoAtual.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    final payload = <String, dynamic>{
+      'observacoes_pedido': '[${p.draftType}] ${_notes.text.trim()}',
+      'itens': p.itensPedidoAtual
+          .map((i) => {
+                'produto_nome': i.produtoNome,
+                'quantidade': i.quantidade,
+                'ingredientes': i.ingredientes
+                    .map((s) => {'nome': s, 'quantidade': 1})
+                    .toList(),
+                'observacoes_item': i.observacoesItem
+              })
+          .toList(),
     };
-
-    final fingerprint = jsonEncode(pedidoPayload);
-    if (_submittedFingerprint != fingerprint) {
-      _submittedFingerprint = fingerprint;
+    final fingerprint = jsonEncode(payload);
+    if (_fingerprint != fingerprint) {
+      _fingerprint = fingerprint;
       _commandId = newCommandId();
     }
-    pedidoPayload['command_id'] = _commandId;
-
+    payload['command_id'] = _commandId;
+    setState(() => _busy = true);
     try {
-      final response =
-          await _apiService.inserirPedido('pedidos', pedidoPayload);
-
+      final result =
+          await (widget.api ?? ApiService()).inserirPedido('pedidos', payload);
+      p.setUltimoPedido(result['numero_pedido'] as int,
+          (result['total_pedido'] as num).toDouble());
+      p.limparPedido();
+      await p.refresh();
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(
-                'Pedido #${response['numero_pedido']} confirmado com sucesso!')),
-      );
-
-      // Atualiza o estado do último pedido no Provider
-      pedidosProvider.setUltimoPedido(response['numero_pedido'] as int,
-          (response['total_pedido'] as num).toDouble());
-
-      // Limpa o pedido atual e volta para a tela anterior
-      pedidosProvider.limparPedido();
-      await pedidosProvider.refresh();
-      if (!mounted) return;
-      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(result['numero_pedido'] > 0
+              ? 'Pedido confirmado · senha ${result['numero_pedido']}'
+              : 'Pedido de balcão confirmado')));
+      Navigator.pop(context);
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao confirmar pedido: ${e.toString()}')),
-      );
-    } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
       }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
-  // Widget auxiliar para os botões de categoria
-  Widget _buildCategoryButton(BuildContext context,
-      {required String text, required VoidCallback onPressed}) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.amber.shade700, // Cor de pastel!
-        foregroundColor: const Color.fromARGB(183, 0, 0, 0),
-        padding: const EdgeInsets.symmetric(vertical: 32), // Slight increase
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-            fontSize: 22, fontWeight: FontWeight.bold), // Slight increase
-      ),
-    );
-  }
-
-  // Widget auxiliar para a barra inferior (Cancelar e Confirmar)
-  Widget _buildBottomBar(
-      BuildContext context, PedidosProvider pedidosProvider, bool canConfirm) {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      color: Colors.white,
-      child: Row(
-        children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: _isLoading
-                  ? null
-                  : () {
-                      pedidosProvider.limparPedido();
-                      Navigator.of(context)
-                          .pop(); // Volta para a tela de navegação
-                    },
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                    vertical: 35), // Significant increase
-                side: const BorderSide(color: Colors.red),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Cancelar Pedido',
-                  style: TextStyle(
-                      fontSize: 28,
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold)), // Significant increase
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: ElevatedButton(
-              onPressed:
-                  canConfirm ? () => _confirmarPedido(pedidosProvider) : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green.shade600,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                    vertical: 35), // Significant increase
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      width: 30,
-                      height: 30,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 3),
-                    )
-                  : const Text('Confirmar Pedido',
-                      style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold)), // Significant increase
-            ),
-          ),
-        ],
-      ),
-    );
+  Widget _categories() =>
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Adicionar ao pedido',
+            style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 14),
+        FilledButton.icon(
+            onPressed: _addPastel,
+            icon: const Icon(Icons.restaurant),
+            label: const Text('Pastel personalizado')),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+            onPressed: () => _addProduct('salgado'),
+            icon: const Icon(Icons.bakery_dining_outlined),
+            label: const Text('Salgados')),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+            onPressed: () => _addProduct('bebida'),
+            icon: const Icon(Icons.local_drink_outlined),
+            label: const Text('Bebidas')),
+      ]);
+  Widget _type(PedidosProvider p) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Como vai ser servido?',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 10),
+        SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(
+                  value: 'Consumo',
+                  label: Text('No local'),
+                  icon: Icon(Icons.restaurant_outlined)),
+              ButtonSegment(
+                  value: 'Viagem',
+                  label: Text('Viagem'),
+                  icon: Icon(Icons.takeout_dining_outlined))
+            ],
+            selected: {
+              p.draftType
+            },
+            showSelectedIcon: false,
+            onSelectionChanged: (s) => setState(() => p.draftType = s.single)),
+      ]);
+  Widget _observations(PedidosProvider p) => TextField(
+      controller: _notes,
+      onChanged: (v) => p.draftNotes = v,
+      minLines: 2,
+      maxLines: 3,
+      decoration: const InputDecoration(
+          labelText: 'Observação do pedido',
+          hintText: 'Ex.: separar bebidas, embalar junto',
+          alignLabelWithHint: true));
+  Widget _comanda(PedidosProvider p, bool wide) {
+    final items = p.itensPedidoAtual;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(children: [
+            const Expanded(
+                child: Text('Comanda',
+                    style:
+                        TextStyle(fontSize: 23, fontWeight: FontWeight.w800))),
+            Text('${items.length} ${items.length == 1 ? 'item' : 'itens'}',
+                style: const TextStyle(color: mutedInk))
+          ])),
+      Expanded(
+          child: items.isEmpty
+              ? SurfaceCard(
+                  child: Center(
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.receipt_long_outlined,
+                      size: 48, color: mutedInk),
+                  const SizedBox(height: 12),
+                  const Text('Sua comanda começa aqui',
+                      style:
+                          TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  const Text('Adicione um pastel, salgado ou bebida.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: mutedInk, fontSize: 17)),
+                  if (!wide) ...[
+                    const SizedBox(height: 16),
+                    FilledButton(
+                        onPressed: _addPastel,
+                        child: const Text('Escolher recheios'))
+                  ]
+                ])))
+              : ListView.separated(
+                  itemCount: items.length + (wide ? 0 : 1),
+                  separatorBuilder: (_, index) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    if (index == items.length) {
+                      return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: _observations(p));
+                    }
+                    final i = items[index];
+                    return SurfaceCard(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                        child: Text(i.produtoNome,
+                                            style: const TextStyle(
+                                                fontSize: 21,
+                                                fontWeight: FontWeight.w800))),
+                                    Text(money(itemUnitCents(i) * i.quantidade),
+                                        style: const TextStyle(
+                                            fontSize: 21,
+                                            fontWeight: FontWeight.w800))
+                                  ]),
+                              if (i.ingredientes.isNotEmpty)
+                                Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Text(i.ingredientes.join(' · '),
+                                        style: const TextStyle(
+                                            fontSize: 17, color: mutedInk))),
+                              if (i.observacoesItem.isNotEmpty)
+                                Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Text('OBS: ${i.observacoesItem}',
+                                        style: const TextStyle(
+                                            color: brand,
+                                            fontWeight: FontWeight.w600))),
+                              const SizedBox(height: 12),
+                              Row(children: [
+                                QuantityStepper(
+                                    value: i.quantidade,
+                                    label: i.produtoNome,
+                                    onChanged: (v) =>
+                                        p.alterarQuantidade(i, v)),
+                                const Spacer(),
+                                IconButton(
+                                    tooltip: 'Remover ${i.produtoNome}',
+                                    onPressed: () {
+                                      p.removerItem(i);
+                                      ScaffoldMessenger.of(context)
+                                          .hideCurrentSnackBar();
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(SnackBar(
+                                              content: Text(
+                                                  '${i.produtoNome} removido'),
+                                              action: SnackBarAction(
+                                                  label: 'Desfazer',
+                                                  onPressed: () => p
+                                                      .inserirItem(index, i))));
+                                    },
+                                    icon: const Icon(Icons.delete_outline,
+                                        color: mutedInk))
+                              ]),
+                            ]));
+                  },
+                )),
+    ]);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Observa o Provider para reconstruir a lista de itens e o subtotal
-    final pedidosProvider = Provider.of<PedidosProvider>(context);
-    final bool canConfirm =
-        pedidosProvider.itensPedidoAtual.isNotEmpty && !_isLoading;
-
-    final double subtotal = _calcularSubtotal();
-    final String subtotalFormatado =
-        NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(subtotal);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Novo Pedido (Montagem)'),
-        backgroundColor: Colors.deepOrange,
-      ),
-      body: Column(
-        children: [
-          // Área dos botões de categoria
-          Container(
-            color: Colors.grey[100],
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildCategoryButton(
-                  context,
-                  text: 'Inserir Pastel', // Updated text
-                  onPressed: () => _navigateAndAddItem(context),
-                ),
-                const SizedBox(height: 8.0),
-                Row(
-                  children: [
+    final p = context.watch<PedidosProvider>();
+    final units = p.itensPedidoAtual.fold<int>(0, (n, i) => n + i.quantidade);
+    final total = p.itensPedidoAtual
+        .fold<int>(0, (n, i) => n + itemUnitCents(i) * i.quantidade);
+    return PopScope(
+        canPop: !_busy,
+        child: Scaffold(
+          appBar: AppBar(title: const Text('Montar pedido'), actions: [
+            TextButton.icon(
+                onPressed: _busy ? null : () => _discard(p),
+                icon: const Icon(Icons.delete_sweep_outlined),
+                label: const Text('Limpar')),
+            const SizedBox(width: 12)
+          ]),
+          body: AbsorbPointer(
+              absorbing: _busy,
+              child: LayoutBuilder(builder: (context, c) {
+                final wide = c.maxWidth >= 900;
+                return Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                    child: wide
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                                Expanded(child: _comanda(p, true)),
+                                const SizedBox(width: 20),
+                                SizedBox(
+                                    width: 300,
+                                    child: SingleChildScrollView(
+                                        child: SurfaceCard(
+                                            child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.stretch,
+                                                children: [
+                                          _categories(),
+                                          const Padding(
+                                              padding: EdgeInsets.symmetric(
+                                                  vertical: 16),
+                                              child: Divider()),
+                                          _type(p),
+                                          const SizedBox(height: 24),
+                                          _observations(p)
+                                        ]))))
+                              ])
+                        : Column(children: [
+                            SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(children: [
+                                  FilledButton.icon(
+                                      onPressed: _addPastel,
+                                      icon: const Icon(Icons.restaurant),
+                                      label: const Text('Pastel')),
+                                  const SizedBox(width: 10),
+                                  OutlinedButton.icon(
+                                      onPressed: () => _addProduct('salgado'),
+                                      icon: const Icon(
+                                          Icons.bakery_dining_outlined),
+                                      label: const Text('Salgados')),
+                                  const SizedBox(width: 10),
+                                  OutlinedButton.icon(
+                                      onPressed: () => _addProduct('bebida'),
+                                      icon: const Icon(
+                                          Icons.local_drink_outlined),
+                                      label: const Text('Bebidas'))
+                                ])),
+                            const SizedBox(height: 16),
+                            _type(p),
+                            const SizedBox(height: 18),
+                            Expanded(child: _comanda(p, false)),
+                          ]));
+              })),
+          bottomNavigationBar: SafeArea(
+              top: false,
+              child: Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: const BoxDecoration(
+                      color: Colors.white,
+                      border:
+                          Border(top: BorderSide(color: Color(0xFFE0E5DF)))),
+                  child: Row(children: [
                     Expanded(
-                      child: _buildCategoryButton(
-                        context,
-                        text: 'Inserir Bebida', // Updated text
-                        onPressed: () =>
-                            _navigateAndAddProducts(context, 'bebida'),
-                      ),
-                    ),
-                    const SizedBox(width: 8.0),
-                    Expanded(
-                      child: _buildCategoryButton(
-                        context,
-                        text: 'Inserir Salgado', // Updated text
-                        onPressed: () =>
-                            _navigateAndAddProducts(context, 'salgado'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Área da Lista de Itens (Comanda)
-          Expanded(
-            child: Container(
-              color: const Color.fromARGB(235, 255, 255, 255),
-              child: pedidosProvider.itensPedidoAtual.isEmpty
-                  ? const Center(
-                      child: Text('Nenhum item adicionado à comanda.',
-                          style: TextStyle(
-                              fontSize: 24,
-                              color: Colors.blueGrey) // Increased size
-                          ),
-                    )
-                  : ListView.builder(
-                      itemCount: pedidosProvider.itensPedidoAtual.length,
-                      itemBuilder: (context, index) {
-                        final item = pedidosProvider.itensPedidoAtual[index];
-                        // Calcula o preço individual do item para exibição na lista
-                        final itemPreco = item.produtoNome == 'Pastel'
-                            ? _calcularPrecoPastel(item)
-                            : item.preco * item.quantidade;
-                        final itemPrecoFormatado = NumberFormat.currency(
-                                locale: 'pt_BR', symbol: 'R\$')
-                            .format(itemPreco);
-
-                        return Container(
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8), // Increased vertical margin
-                          decoration: BoxDecoration(
-                            border: Border(
-                                bottom:
-                                    BorderSide(color: Colors.grey.shade200)),
-                          ),
-                          child: ListTile(
-                            leading: Text('${item.quantidade}x',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 22)), // Increased size
-                            title: Text(item.produtoNome,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 26) // Increased size
-                                ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Exibe os ingredientes se for um pastel customizado
-                                if (item.ingredientes.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4.0),
-                                    child: Text(
-                                        'Ingredientes: ${item.ingredientes.join(', ')}',
-                                        style: const TextStyle(
-                                            fontStyle: FontStyle.italic,
-                                            fontSize: 20) // Increased size
-                                        ),
-                                  ),
-                                // Exibe as observações
-                                if (item.observacoesItem.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4.0),
-                                    child: Text('OBS: ${item.observacoesItem}',
-                                        style: TextStyle(
-                                            fontStyle: FontStyle.normal,
-                                            fontSize: 20,
-                                            color: Colors
-                                                .red.shade700) // Increased size
-                                        ),
-                                  ),
-                              ],
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(itemPrecoFormatado,
-                                    style: const TextStyle(
-                                        fontSize: 24,
-                                        fontWeight:
-                                            FontWeight.bold)), // Increased size
-                                IconButton(
-                                  icon: const Icon(Icons.delete_forever,
-                                      color: Colors.red,
-                                      size: 32), // Increased icon size
-                                  onPressed: () {
-                                    pedidosProvider.removerItem(item);
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ),
-
-          // Rodapé fixo com Subtotal
-          Container(
-            padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withValues(alpha: 0.3),
-                  spreadRadius: 1,
-                  blurRadius: 5,
-                  offset: const Offset(0, -3),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Subtotal:',
-                    style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black)), // Increased size
-                Text(subtotalFormatado,
-                    style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.deepOrange.shade700) // Increased size
-                    ),
-              ],
-            ),
-          ),
-
-          // Campo de Observações
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            color: Colors.white,
-            child: TextField(
-              controller: _observacoesController,
-              style: const TextStyle(fontSize: 20), // Increased input text size
-              decoration: const InputDecoration(
-                labelText: 'Observações do Pedido',
-                labelStyle: TextStyle(fontSize: 20), // Increased label size
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.note, size: 28), // Increased icon size
-              ),
-              maxLines: 2,
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar:
-          _buildBottomBar(context, pedidosProvider, canConfirm),
-    );
+                        child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          Text(
+                              '$units ${units == 1 ? 'unidade' : 'unidades'} · total',
+                              style: const TextStyle(color: mutedInk)),
+                          Text(money(total),
+                              style: const TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w800,
+                                  color: ink))
+                        ])),
+                    FilledButton.icon(
+                        onPressed:
+                            units > 0 && !_busy ? () => _confirm(p) : null,
+                        icon: _busy
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.check),
+                        label: Text(_busy ? 'Enviando…' : 'Confirmar pedido'))
+                  ]))),
+        ));
   }
 }

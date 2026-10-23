@@ -23,6 +23,8 @@ class PedidosProvider extends ChangeNotifier with WidgetsBindingObserver {
   bool loading = false;
   DateTime? lastSync;
   String draftCommandId = newCommandId();
+  String draftNotes = '';
+  String draftType = 'Consumo';
   WebSocket? _socket;
   Timer? _poll;
   bool _disposed = false;
@@ -52,8 +54,23 @@ class PedidosProvider extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  void alterarQuantidade(ItemPedido item, int quantity) {
+    if (!_draft.contains(item) || quantity < 1 || quantity > 999) return;
+    item.quantidade = quantity;
+    draftCommandId = newCommandId();
+    notifyListeners();
+  }
+
+  void inserirItem(int index, ItemPedido item) {
+    _draft.insert(index.clamp(0, _draft.length), item);
+    draftCommandId = newCommandId();
+    notifyListeners();
+  }
+
   void limparPedido() {
     _draft.clear();
+    draftNotes = '';
+    draftType = 'Consumo';
     draftCommandId = newCommandId();
     notifyListeners();
   }

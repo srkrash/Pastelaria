@@ -1,3 +1,4 @@
+import '../ui/app_ui.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -311,120 +312,224 @@ class _ConfigScreenState extends State<ConfigScreen> {
     super.dispose();
   }
 
+  Widget _section(String title, IconData icon, List<Widget> children) =>
+      SurfaceCard(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Icon(icon, color: brand),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Text(title,
+                  style: const TextStyle(
+                      fontSize: 21, fontWeight: FontWeight.w800)))
+        ]),
+        const SizedBox(height: 18),
+        ...children,
+      ]));
   @override
   Widget build(BuildContext context) => Scaffold(
-      appBar: AppBar(title: const Text('Configuração dos tablets')),
-      body: _busy
-          ? const Center(child: CircularProgressIndicator())
-          : Center(
-              child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: ListView(padding: const EdgeInsets.all(24), children: [
-                    const Text('Servidor e rede local',
-                        style: TextStyle(
-                            fontSize: 26, fontWeight: FontWeight.bold)),
-                    SwitchListTile(
-                        title: const Text('Este é o tablet principal'),
-                        subtitle: const Text(
-                            'Ative em apenas um aparelho. Mantenha o aplicativo aberto e o tablet ligado durante o atendimento.'),
-                        value: _host,
-                        onChanged: (v) => setState(() {
-                              _host = v;
-                              if (v && _secret.text.isEmpty) {
-                                _secret.text = newCommandId();
-                              }
-                            })),
-                    if (_host)
-                      SelectableText(
-                          'IP deste aparelho: ${_ips.isEmpty ? 'não identificado' : _ips}\nPorta do servidor: 5000'),
-                    if (!_host)
-                      TextField(
-                          controller: _address,
-                          decoration: const InputDecoration(
-                              labelText: 'IP do tablet principal',
-                              hintText: '192.168.1.10')),
-                    const SizedBox(height: 16),
-                    TextField(
-                        controller: _secret,
-                        obscureText: !_showSecret,
-                        decoration: InputDecoration(
-                            labelText:
-                                'Chave de conexão (igual nos três tablets)',
-                            suffixIcon: IconButton(
-                                onPressed: () =>
-                                    setState(() => _showSecret = !_showSecret),
-                                icon: const Icon(Icons.visibility)))),
-                    if (_host)
-                      TextButton.icon(
-                          onPressed: () => Clipboard.setData(
-                              ClipboardData(text: _secret.text)),
-                          icon: const Icon(Icons.copy),
-                          label: const Text(
-                              'Copiar chave para configurar os outros tablets')),
-                    const SizedBox(height: 24),
-                    DropdownButtonFormField<String>(
-                        initialValue: _role,
-                        decoration: const InputDecoration(
-                            labelText: 'Tela inicial deste tablet'),
-                        items: const [
-                          DropdownMenuItem(
-                              value: 'pedido', child: Text('Pedidos / caixa')),
-                          DropdownMenuItem(
-                              value: 'cozinha', child: Text('Cozinha')),
-                          DropdownMenuItem(
-                              value: 'entrega', child: Text('Entrega'))
-                        ],
-                        onChanged: (v) => setState(() => _role = v!)),
-                    if (_host) ...[
-                      const SizedBox(height: 24),
-                      const Text('Impressora Tanca por cabo de rede',
-                          style: TextStyle(
-                              fontSize: 22, fontWeight: FontWeight.bold)),
-                      TextField(
-                          controller: _printer,
-                          decoration: const InputDecoration(
-                              labelText:
-                                  'IP da impressora (opcional durante configuração)')),
-                      TextField(
-                          controller: _port,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                              labelText:
-                                  'Porta TCP (confirmar; sugestão 9100)')),
-                      const Text(
-                          'Sem IP de impressora, os pedidos ficam com impressão pendente.'),
-                    ],
-                    const SizedBox(height: 24),
-                    FilledButton.icon(
-                        onPressed: _save,
-                        icon: const Icon(Icons.save),
-                        label: const Text('Salvar e conectar')),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                        onPressed: _jobs,
-                        icon: const Icon(Icons.print),
-                        label: const Text('Fila de impressão / segunda via')),
-                    OutlinedButton.icon(
-                        onPressed: _recoverOrder,
-                        icon: const Icon(Icons.sync_problem),
-                        label: const Text(
-                            'Resolver confirmação de pedido pendente')),
-                    if (ServerRuntime.instance.store != null) ...[
-                      const SizedBox(height: 12),
-                      OutlinedButton.icon(
-                          onPressed: () => _backup(),
-                          icon: const Icon(Icons.backup),
-                          label: const Text('Exportar backup protegido')),
-                      OutlinedButton.icon(
-                          onPressed: () => _backup(restore: true),
-                          icon: const Icon(Icons.restore),
-                          label: const Text(
-                              'Restaurar backup em servidor sem pedidos')),
-                      Text(ServerRuntime.instance.backupError ??
-                          'Backup local na abertura e a cada hora com servidor ativo; guarda os últimos 7 dias.'),
-                    ],
-                    const SizedBox(height: 16),
-                    const Text(
-                        'Versão 2 em validação: use a rede privada da operação. Backup em nuvem e homologação no SM-T815Y ainda pendentes.'),
-                  ]))));
+        appBar: AppBar(title: const Text('Configurações')),
+        body: _busy
+            ? const Center(child: CircularProgressIndicator())
+            : Center(
+                child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 800),
+                    child: ListView(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                        children: [
+                          _section(
+                              'Este tablet', Icons.tablet_android_outlined, [
+                            DropdownButtonFormField<String>(
+                                initialValue: _role,
+                                decoration: const InputDecoration(
+                                    labelText: 'Abrir sempre em'),
+                                items: const [
+                                  DropdownMenuItem(
+                                      value: 'pedido',
+                                      child: Text('Pedidos / caixa')),
+                                  DropdownMenuItem(
+                                      value: 'cozinha', child: Text('Cozinha')),
+                                  DropdownMenuItem(
+                                      value: 'entrega', child: Text('Entrega'))
+                                ],
+                                onChanged: (v) => setState(() => _role = v!)),
+                            const SizedBox(height: 12),
+                            SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text(
+                                    'Hospedar os pedidos neste aparelho',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w700)),
+                                subtitle: const Text(
+                                    'Ative em apenas um tablet. Ele precisa permanecer ligado durante o atendimento.'),
+                                value: _host,
+                                onChanged: (v) => setState(() {
+                                      _host = v;
+                                      if (v && _secret.text.isEmpty) {
+                                        _secret.text = newCommandId();
+                                      }
+                                    })),
+                          ]),
+                          const SizedBox(height: 18),
+                          _section(
+                              'Conexão entre os tablets', Icons.wifi_outlined, [
+                            if (_host) ...[
+                              SelectableText(
+                                  'IP deste tablet: ${_ips.isEmpty ? 'não identificado' : _ips}',
+                                  style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 8),
+                              const Text(
+                                  'Informe este IP e a chave abaixo nos outros dois aparelhos.',
+                                  style: TextStyle(color: mutedInk)),
+                              const SizedBox(height: 16)
+                            ],
+                            if (!_host) ...[
+                              TextField(
+                                  controller: _address,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  decoration: const InputDecoration(
+                                      labelText: 'IP do tablet principal',
+                                      hintText: '192.168.1.10')),
+                              const SizedBox(height: 16)
+                            ],
+                            TextField(
+                                controller: _secret,
+                                obscureText: !_showSecret,
+                                autocorrect: false,
+                                enableSuggestions: false,
+                                decoration: InputDecoration(
+                                    labelText: 'Chave de conexão',
+                                    helperText:
+                                        'Use a mesma chave nos três tablets.',
+                                    suffixIcon: IconButton(
+                                        tooltip: _showSecret
+                                            ? 'Ocultar chave'
+                                            : 'Mostrar chave',
+                                        onPressed: () => setState(
+                                            () => _showSecret = !_showSecret),
+                                        icon: Icon(_showSecret
+                                            ? Icons.visibility_off_outlined
+                                            : Icons.visibility_outlined)))),
+                            if (_host)
+                              Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                      onPressed: () async {
+                                        await Clipboard.setData(
+                                            ClipboardData(text: _secret.text));
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(const SnackBar(
+                                                  content:
+                                                      Text('Chave copiada.')));
+                                        }
+                                      },
+                                      icon: const Icon(Icons.copy),
+                                      label: const Text('Copiar chave'))),
+                          ]),
+                          if (_host) ...[
+                            const SizedBox(height: 18),
+                            _section('Impressora Tanca', Icons.print_outlined, [
+                              const Text(
+                                  'Conecte a impressora ao roteador por cabo de rede.',
+                                  style: TextStyle(color: mutedInk)),
+                              const SizedBox(height: 16),
+                              TextField(
+                                  controller: _printer,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  decoration: const InputDecoration(
+                                      labelText: 'IP da impressora',
+                                      hintText: '192.168.1.20')),
+                              const SizedBox(height: 16),
+                              TextField(
+                                  controller: _port,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Porta da impressora',
+                                      helperText:
+                                          'Confirme a porta na configuração da Tanca.')),
+                              const SizedBox(height: 12),
+                              const Text(
+                                  'Sem impressora configurada, os pedidos ficam salvos e a impressão aguarda.',
+                                  style: TextStyle(color: mutedInk)),
+                            ]),
+                          ],
+                          const SizedBox(height: 18),
+                          _section('Acompanhamento e recuperação',
+                              Icons.health_and_safety_outlined, [
+                            OutlinedButton.icon(
+                                onPressed: _jobs,
+                                icon: const Icon(Icons.print_outlined),
+                                label: const Text(
+                                    'Fila de impressão e segunda via')),
+                            const SizedBox(height: 10),
+                            OutlinedButton.icon(
+                                onPressed: _recoverOrder,
+                                icon: const Icon(Icons.sync_problem_outlined),
+                                label: const Text(
+                                    'Resolver pedido com confirmação pendente')),
+                            if (ServerRuntime.instance.store != null) ...[
+                              const SizedBox(height: 18),
+                              const Divider(),
+                              const SizedBox(height: 12),
+                              FilledButton.tonalIcon(
+                                  onPressed: () => _backup(),
+                                  icon: const Icon(Icons.backup_outlined),
+                                  label:
+                                      const Text('Exportar backup protegido')),
+                              const SizedBox(height: 10),
+                              Text(
+                                  ServerRuntime.instance.backupError ??
+                                      'Cópias locais na abertura e a cada hora com o servidor ativo. Histórico dos últimos 7 dias.',
+                                  style: const TextStyle(color: mutedInk)),
+                              const SizedBox(height: 10),
+                              const StatusPill(
+                                  'Backup na nuvem não configurado',
+                                  color: mutedInk,
+                                  icon: Icons.cloud_off_outlined),
+                              const SizedBox(height: 12),
+                              ExpansionTile(
+                                  tilePadding: EdgeInsets.zero,
+                                  title:
+                                      const Text('Restaurar em outro tablet'),
+                                  children: [
+                                    const Text(
+                                        'Use apenas em um servidor sem pedidos, com o aparelho principal anterior desligado.',
+                                        style: TextStyle(color: mutedInk)),
+                                    const SizedBox(height: 12),
+                                    OutlinedButton.icon(
+                                        onPressed: () => _backup(restore: true),
+                                        icon: const Icon(Icons.restore),
+                                        label: const Text(
+                                            'Escolher arquivo de backup'))
+                                  ]),
+                            ],
+                          ]),
+                        ]))),
+        bottomNavigationBar: _busy
+            ? null
+            : SafeArea(
+                top: false,
+                child: Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(16),
+                    child: Center(
+                        heightFactor: 1,
+                        child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 760),
+                            child: SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.icon(
+                                    onPressed: _save,
+                                    icon: const Icon(Icons.check),
+                                    label:
+                                        const Text('Salvar e conectar'))))))),
+      );
 }

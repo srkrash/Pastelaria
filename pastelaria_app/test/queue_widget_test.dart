@@ -30,7 +30,8 @@ void main() {
       await tester.pumpWidget(ChangeNotifierProvider.value(value: provider, child: MaterialApp(home: OrderQueueScreen(production: production))));
       await tester.pumpAndSettle();
       expect(find.text('Senha 01'), findsOneWidget);
-      expect(find.text('Prontos: 2/5 · Entregues: 1'), findsWidgets);
+      expect(find.text('Disponíveis: 1'), findsWidgets);
+      expect(find.text('Entregues: 1'), findsWidgets);
       expect(find.textContaining(production ? 'saldo 3' : 'saldo 1'), findsWidgets);
       expect(tester.takeException(), isNull);
       api.data = {'revision': 2, 'pedidos': [order(2)]};
