@@ -1,3 +1,4 @@
+import 'fila_entrega_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
@@ -9,12 +10,14 @@ class EditarPedidoSelecionadoScreen extends StatefulWidget {
   const EditarPedidoSelecionadoScreen({super.key, required this.pedidoId});
 
   @override
-  State<EditarPedidoSelecionadoScreen> createState() => _EditarPedidoSelecionadoScreenState();
+  State<EditarPedidoSelecionadoScreen> createState() =>
+      _EditarPedidoSelecionadoScreenState();
 }
 
-class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoScreen> {
+class _EditarPedidoSelecionadoScreenState
+    extends State<EditarPedidoSelecionadoScreen> {
   final ApiService _apiService = ApiService();
-  // Alteramos o tipo para Future<Map<String, dynamic>> pois o API service retorna um dynamic 
+  // Alteramos o tipo para Future<Map<String, dynamic>> pois o API service retorna um dynamic
   // que esperamos que seja um Map<String, dynamic> após o decode do JSON.
   late Future<Map<String, dynamic>> _pedidoFuture;
 
@@ -68,29 +71,24 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
       case 'aguardando':
         return 'Aguardando Produção';
       default:
-        return status[0].toUpperCase() + status.substring(1); // Capitaliza o primeiro caractere para outros status
+        return status[0].toUpperCase() +
+            status.substring(
+                1); // Capitaliza o primeiro caractere para outros status
     }
   }
-  
+
   // Lógica para atualizar o status do pedido
-  void _updateStatus(int pedidoId, String newStatus) async {
-    // **TO DO: Implementar a chamada à API para atualizar o status aqui**
-    // Exemplo: final success = await _apiService.updatePedidoStatus(pedidoId, newStatus);
-  final bool success = await _apiService.updatePedidoStatus(pedidoId, newStatus);
-    // Atualiza a UI após a simulação (ou sucesso da API)
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Pedido ID$pedidoId atualizado para ${newStatus.toUpperCase()}!')),
-      );
-      Navigator.of(context).pop(true); 
+  Future<void> _updateStatus(int pedidoId, String newStatus) async {
+    try {
+      await _apiService.updatePedidoStatus(pedidoId, newStatus);
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
+      }
     }
-    else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Falha ao atualizar o pedido.')),
-      );
-    }
-    
-    // Volta para a tela anterior, ativando a recarga em EditarPedidosScreen
   }
 
   void _reimprimirPedido(int pedidoId) async {
@@ -134,7 +132,9 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
               backgroundColor: Colors.deepOrange,
               foregroundColor: Colors.white,
             ),
-            body: Center(child: Text('Erro ao carregar detalhes do pedido: ${snapshot.error}')),
+            body: Center(
+                child: Text(
+                    'Erro ao carregar detalhes do pedido: ${snapshot.error}')),
           );
         }
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -144,13 +144,15 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
               backgroundColor: Colors.deepOrange,
               foregroundColor: Colors.white,
             ),
-            body: const Center(child: Text('Detalhes do pedido não encontrados.')),
+            body: const Center(
+                child: Text('Detalhes do pedido não encontrados.')),
           );
         }
 
         final pedido = snapshot.data!;
         final String status = pedido['status']?.toString() ?? 'desconhecido';
-        final double totalPedido = double.tryParse(pedido['total_pedido']?.toString() ?? '0.0') ?? 0.0;
+        final double totalPedido =
+            double.tryParse(pedido['total_pedido']?.toString() ?? '0.0') ?? 0.0;
         final List<dynamic> itens = pedido['itens'] ?? [];
         final String observacao = pedido['observacoes']?.toString() ?? '';
         final int numeroPedido = pedido['numero_pedido'] as int? ?? 0;
@@ -180,7 +182,9 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Status Atual:', style: TextStyle(fontSize: 18, color: Colors.blueGrey)),
+                        const Text('Status Atual:',
+                            style: TextStyle(
+                                fontSize: 18, color: Colors.blueGrey)),
                         Text(
                           _getStatusText(status),
                           style: TextStyle(
@@ -194,7 +198,9 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Text('Total do Pedido:', style: TextStyle(fontSize: 18, color: Colors.blueGrey)),
+                        const Text('Total do Pedido:',
+                            style: TextStyle(
+                                fontSize: 18, color: Colors.blueGrey)),
                         Text(
                           formatter.format(totalPedido),
                           style: const TextStyle(
@@ -212,15 +218,20 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
               // Observações do Pedido (se houver)
               if (observacao.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 24.0, vertical: 12.0),
                   child: Row(
                     children: [
-                      const Icon(Icons.info_outline, color: Colors.blueGrey, size: 28),
+                      const Icon(Icons.info_outline,
+                          color: Colors.blueGrey, size: 28),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Obs. Pedido: $observacao',
-                          style: TextStyle(fontStyle: FontStyle.italic, color: Colors.blueGrey.shade700, fontSize: 20),
+                          style: TextStyle(
+                              fontStyle: FontStyle.italic,
+                              color: Colors.blueGrey.shade700,
+                              fontSize: 20),
                         ),
                       ),
                     ],
@@ -231,7 +242,9 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
 
               const Padding(
                 padding: EdgeInsets.all(16.0),
-                child: Text('Itens do Pedido:', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                child: Text('Itens do Pedido:',
+                    style:
+                        TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               ),
 
               // Lista de Itens
@@ -240,25 +253,40 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
                   itemCount: itens.length,
                   itemBuilder: (context, index) {
                     final item = itens[index];
-                    final String produtoNome = item['produto_nome']?.toString() ?? 'Produto Desconhecido';
+                    final String produtoNome =
+                        item['produto_nome']?.toString() ??
+                            'Produto Desconhecido';
                     final int quantidade = item['quantidade'] as int? ?? 0;
 
-                    final double precoUnitario = double.tryParse(item['preco_unitario']?.toString() ?? '0.0') ?? 0.0;
-                    final double subtotal = double.tryParse(item['subtotal']?.toString() ?? '0.0') ?? 0.0;
-                    final List<String> ingredientes = (item['ingredientes'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
-                    final String observacaoItem = item['observacoes_item']?.toString() ?? '';
-                    final String statusItem = item['status_item']?.toString() ?? 'aguardando';
+                    final double precoUnitario = double.tryParse(
+                            item['preco_unitario']?.toString() ?? '0.0') ??
+                        0.0;
+                    final double subtotal = double.tryParse(
+                            item['subtotal']?.toString() ?? '0.0') ??
+                        0.0;
+                    final List<String> ingredientes =
+                        (item['ingredientes'] as List<dynamic>?)
+                                ?.map((e) => e.toString())
+                                .toList() ??
+                            [];
+                    final String observacaoItem =
+                        item['observacoes_item']?.toString() ?? '';
+                    final String statusItem =
+                        item['status_item']?.toString() ?? 'aguardando';
 
-                    String subtitleText = 'Preço Unit.: ${formatter.format(precoUnitario)}';
+                    String subtitleText =
+                        'Preço Unit.: ${formatter.format(precoUnitario)}';
                     if (ingredientes.isNotEmpty) {
-                      subtitleText += '\nIngredientes: ${ingredientes.join(', ')}';
+                      subtitleText +=
+                          '\nIngredientes: ${ingredientes.join(', ')}';
                     }
                     if (observacaoItem.isNotEmpty) {
                       subtitleText += '\nObs. Item: $observacaoItem';
                     }
 
                     return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       elevation: 2,
                       child: Padding(
                         padding: const EdgeInsets.all(8.0),
@@ -266,14 +294,23 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
                           leading: CircleAvatar(
                             radius: 25,
                             backgroundColor: Colors.deepOrange.shade100,
-                            child: Text('${quantidade}x', style: const TextStyle(color: Colors.deepOrange, fontSize: 20, fontWeight: FontWeight.bold)),
+                            child: Text('${quantidade}x',
+                                style: const TextStyle(
+                                    color: Colors.deepOrange,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold)),
                           ),
-                          title: Text(produtoNome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+                          title: Text(produtoNome,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 22)),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const SizedBox(height: 4),
-                              Text(subtitleText, style: TextStyle(fontSize: 18, color: Colors.grey.shade700)),
+                              Text(subtitleText,
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.grey.shade700)),
                               const SizedBox(height: 8),
                               Text(
                                 _getStatusText(statusItem),
@@ -285,10 +322,9 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
                               ),
                             ],
                           ),
-                          trailing: Text(
-                            formatter.format(subtotal),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)
-                          ),
+                          trailing: Text(formatter.format(subtotal),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 20)),
                           isThreeLine: true,
                         ),
                       ),
@@ -306,28 +342,37 @@ class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoS
                       // Botão Cancelar
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () => _updateStatus(pedido['id'], 'cancelado'),
+                          onPressed: () =>
+                              _updateStatus(pedido['id'], 'cancelado'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red.shade700,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 25),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
                           ),
-                          child: const Text('Cancelar Pedido', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                          child: const Text('Cancelar Pedido',
+                              style: TextStyle(
+                                  fontSize: 22, fontWeight: FontWeight.bold)),
                         ),
                       ),
                       const SizedBox(width: 24),
                       // Botão Finalizar
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () => _updateStatus(pedido['id'], 'fechado'),
+                          onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const FilaEntregaScreen())),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green.shade700,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 25),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
                           ),
-                          child: const Text('Finalizar Pedido', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                          child: const Text('Abrir Entrega',
+                              style: TextStyle(
+                                  fontSize: 22, fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],

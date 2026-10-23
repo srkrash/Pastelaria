@@ -4,9 +4,11 @@ import 'package:pastelaria_app/screens/pedido_screen.dart';
 import 'package:pastelaria_app/screens/fila_entrega_screen.dart';
 import 'package:pastelaria_app/screens/config_screen.dart';
 import 'package:pastelaria_app/screens/log_screen.dart';
+import '../services/app_settings.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final String initialRole;
+  const MainScreen({super.key, this.initialRole = 'pedido'});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -14,6 +16,35 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialRole == 'cozinha'
+        ? 1
+        : widget.initialRole == 'entrega'
+            ? 2
+            : 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final settings = await AppSettings.load();
+      if (!mounted || settings.configured) return;
+      await _configure();
+    });
+  }
+
+  Future<void> _configure() async {
+    await Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const ConfigScreen()));
+    final settings = await AppSettings.load();
+    if (!mounted) return;
+    setState(() {
+      _selectedIndex = settings.role == 'cozinha'
+          ? 1
+          : settings.role == 'entrega'
+              ? 2
+              : 0;
+    });
+  }
 
   final List<Widget> _widgetOptions = <Widget>[
     const PedidoScreen(),
@@ -35,9 +66,7 @@ class _MainScreenState extends State<MainScreen> {
         title: const Text('Pastelaria App'),
         backgroundColor: Colors.amber,
       ),
-
       body: _widgetOptions.elementAt(_selectedIndex),
-
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -91,10 +120,7 @@ class _MainScreenState extends State<MainScreen> {
               title: const Text('Configurações'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ConfigScreen()),
-                );
+                _configure();
               },
             ),
             ListTile(
@@ -119,7 +145,7 @@ class _MainScreenState extends State<MainScreen> {
                   builder: (context) => AlertDialog(
                     title: const Text('Pastelaria App'),
                     content: const Text(
-                        'Pastelaria da Gaucha\n\nFay Klagenberg\nVer. 1.0.4 - 27/11/2025'),
+                        'Pastelaria Gaúcha\nServidor local no tablet\nVersão 2.0.0 em validação'),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),

@@ -6,6 +6,8 @@ import 'package:pastelaria_app/screens/add_pastel_screen.dart';
 import 'package:pastelaria_app/screens/add_product_screen.dart';
 import 'package:pastelaria_app/models/item_pedido.dart';
 import 'package:pastelaria_app/services/api_service.dart';
+import 'package:pastelaria_app/services/app_settings.dart';
+import 'dart:convert';
 
 class NovoPedidoScreen extends StatefulWidget {
   const NovoPedidoScreen({super.key});
@@ -19,6 +21,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
   // Instancia o serviço de API
   final ApiService _apiService = ApiService();
   final TextEditingController _observacoesController = TextEditingController();
+  String? _submittedFingerprint;
+  String _commandId = newCommandId();
 
   @override
   void dispose() {
@@ -45,7 +49,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
 
       // Nome padrão para o pastel customizado
       String produtoNome = 'Pastel';
-      
+
       // Cria o novo item e adiciona ao pedido
       final novoItem = ItemPedido(
         id: 0,
@@ -55,7 +59,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
         produtoNome: produtoNome,
         statusItem: 'aguardando',
         // O preço é 0.0 aqui, pois será calculado dinamicamente no _calcularSubtotal
-        preco: 0.0, 
+        preco: 0.0,
         ingredientes: ingredientes,
         observacoesItem: observacoes,
       );
@@ -66,7 +70,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
 
   // Método para navegar e adicionar produtos simples (bebidas, salgados)
   void _navigateAndAddProducts(BuildContext context, String productType) async {
-    final pedidosProvider = Provider.of<PedidosProvider>(context, listen: false);
+    final pedidosProvider =
+        Provider.of<PedidosProvider>(context, listen: false);
 
     final resultado = await Navigator.of(context).push(
       MaterialPageRoute(
@@ -80,7 +85,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
       }
     }
   }
-  
+
   // Função auxiliar para calcular o preço de um pastel específico (baseado na sua lógica)
   double _calcularPrecoPastel(ItemPedido item) {
     // Ingredientes gratuitos que não contam como 'extra'
@@ -93,12 +98,13 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
     // Caso especial 1: Pastel de Pizza (preço fixo)
     if (item.ingredientes.length == 1 && item.ingredientes.first == 'Pizza') {
       return 15.00 * item.quantidade;
-    // Caso especial 2: Pastel Misto (preço fixo)
-    } else if (item.ingredientes.length == 1 && item.ingredientes.first == 'Misto') {
+      // Caso especial 2: Pastel Misto (preço fixo)
+    } else if (item.ingredientes.length == 1 &&
+        item.ingredientes.first == 'Misto') {
       return 25.00 * item.quantidade;
     } else {
       // Lógica para pastéis customizados.
-      
+
       // Filtra os ingredientes que são pagos
       final List<String> ingredientesPagos = item.ingredientes
           .where((ing) => !ingredientesGratuitos.contains(ing))
@@ -119,8 +125,9 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
   double _calcularSubtotal() {
     double total = 0.0;
     // Usa listen: false pois esta função é chamada dentro de build e não precisa de rebuilds internos
-    for (var item in Provider.of<PedidosProvider>(context, listen: false).itensPedidoAtual) {
-      if (item.produtoNome.contains('Pastel')) {
+    for (var item in Provider.of<PedidosProvider>(context, listen: false)
+        .itensPedidoAtual) {
+      if (item.produtoNome == 'Pastel') {
         // Delega o cálculo do preço do pastel
         total += _calcularPrecoPastel(item);
       } else {
@@ -133,6 +140,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
 
   // Função para confirmar o pedido usando o ApiService
   Future<void> _confirmarPedido(PedidosProvider pedidosProvider) async {
+    if (_isLoading) return;
     if (pedidosProvider.itensPedidoAtual.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -148,16 +156,20 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
       barrierDismissible: false, // Obriga o usuário a escolher
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Tipo de Pedido', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-          content: const Text('O pedido é para consumo no local ou viagem?', style: TextStyle(fontSize: 24)),
+          title: const Text('Tipo de Pedido',
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+          content: const Text('O pedido é para consumo no local ou viagem?',
+              style: TextStyle(fontSize: 24)),
           actions: <Widget>[
             TextButton(
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white,
                 backgroundColor: Colors.orange,
-                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
               ),
-              child: const Text('CONSUMO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+              child: const Text('CONSUMO',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
               onPressed: () {
                 Navigator.of(context).pop('Consumo');
               },
@@ -166,15 +178,18 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white,
                 backgroundColor: Colors.blue,
-                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
               ),
-              child: const Text('VIAGEM', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+              child: const Text('VIAGEM',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
               onPressed: () {
                 Navigator.of(context).pop('Viagem');
               },
             ),
             TextButton(
-              child: const Text('Cancelar', style: TextStyle(color: Colors.grey, fontSize: 20)),
+              child: const Text('Cancelar',
+                  style: TextStyle(color: Colors.grey, fontSize: 20)),
               onPressed: () {
                 Navigator.of(context).pop(null); // Retorna null se cancelar
               },
@@ -186,6 +201,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
 
     // Se o usuário cancelou o diálogo (retornou null), não prossegue
     if (tipoPedido == null) return;
+    if (!mounted) return;
 
     setState(() {
       _isLoading = true;
@@ -211,14 +227,23 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
 
     // Monta o payload completo
     final pedidoPayload = {
-      'valor_total': valorTotal, 
-      'observacoes_pedido': observacoesFinais, 
+      'valor_total': valorTotal,
+      'observacoes_pedido': observacoesFinais,
       'itens': itensData,
     };
+
+    final fingerprint = jsonEncode(pedidoPayload);
+    if (_submittedFingerprint != fingerprint) {
+      _submittedFingerprint = fingerprint;
+      _commandId = newCommandId();
+    }
+    pedidoPayload['command_id'] = _commandId;
 
     try {
       final response =
           await _apiService.inserirPedido('pedidos', pedidoPayload);
+
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -227,23 +252,28 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
       );
 
       // Atualiza o estado do último pedido no Provider
-      pedidosProvider.setUltimoPedido(
-          response['numero_pedido'], response['total_pedido']);
+      pedidosProvider.setUltimoPedido(response['numero_pedido'] as int,
+          (response['total_pedido'] as num).toDouble());
 
       // Limpa o pedido atual e volta para a tela anterior
       pedidosProvider.limparPedido();
+      await pedidosProvider.refresh();
+      if (!mounted) return;
       Navigator.of(context).pop();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erro ao confirmar pedido: ${e.toString()}')),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
-  
+
   // Widget auxiliar para os botões de categoria
   Widget _buildCategoryButton(BuildContext context,
       {required String text, required VoidCallback onPressed}) {
@@ -256,13 +286,14 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       child: Text(
-        text, 
-        textAlign: TextAlign.center, 
-        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold), // Slight increase
+        text,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+            fontSize: 22, fontWeight: FontWeight.bold), // Slight increase
       ),
     );
   }
-  
+
   // Widget auxiliar para a barra inferior (Cancelar e Confirmar)
   Widget _buildBottomBar(
       BuildContext context, PedidosProvider pedidosProvider, bool canConfirm) {
@@ -277,16 +308,21 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                   ? null
                   : () {
                       pedidosProvider.limparPedido();
-                      Navigator.of(context).pop(); // Volta para a tela de navegação
+                      Navigator.of(context)
+                          .pop(); // Volta para a tela de navegação
                     },
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 35), // Significant increase
+                padding: const EdgeInsets.symmetric(
+                    vertical: 35), // Significant increase
                 side: const BorderSide(color: Colors.red),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('Cancelar Pedido',
-                  style: TextStyle(fontSize: 28, color: Colors.red, fontWeight: FontWeight.bold)), // Significant increase
+                  style: TextStyle(
+                      fontSize: 28,
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold)), // Significant increase
             ),
           ),
           const SizedBox(width: 16),
@@ -297,7 +333,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green.shade600,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 35), // Significant increase
+                padding: const EdgeInsets.symmetric(
+                    vertical: 35), // Significant increase
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
@@ -306,12 +343,12 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                       width: 30,
                       height: 30,
                       child: CircularProgressIndicator(
-                        color: Colors.white, 
-                        strokeWidth: 3
-                      ),
+                          color: Colors.white, strokeWidth: 3),
                     )
                   : const Text('Confirmar Pedido',
-                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)), // Significant increase
+                      style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold)), // Significant increase
             ),
           ),
         ],
@@ -322,23 +359,26 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
   @override
   Widget build(BuildContext context) {
     // Observa o Provider para reconstruir a lista de itens e o subtotal
-    final pedidosProvider = Provider.of<PedidosProvider>(context); 
-    final bool canConfirm = pedidosProvider.itensPedidoAtual.isNotEmpty && !_isLoading;
+    final pedidosProvider = Provider.of<PedidosProvider>(context);
+    final bool canConfirm =
+        pedidosProvider.itensPedidoAtual.isNotEmpty && !_isLoading;
 
     final double subtotal = _calcularSubtotal();
-    final String subtotalFormatado = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(subtotal);
+    final String subtotalFormatado =
+        NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(subtotal);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Novo Pedido (Montagem)'),
-        backgroundColor: Colors.deepOrange, 
+        backgroundColor: Colors.deepOrange,
       ),
       body: Column(
         children: [
           // Área dos botões de categoria
           Container(
             color: Colors.grey[100],
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -354,7 +394,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                       child: _buildCategoryButton(
                         context,
                         text: 'Inserir Bebida', // Updated text
-                        onPressed: () => _navigateAndAddProducts(context, 'bebida'),
+                        onPressed: () =>
+                            _navigateAndAddProducts(context, 'bebida'),
                       ),
                     ),
                     const SizedBox(width: 8.0),
@@ -362,7 +403,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                       child: _buildCategoryButton(
                         context,
                         text: 'Inserir Salgado', // Updated text
-                        onPressed: () => _navigateAndAddProducts(context, 'salgado'),
+                        onPressed: () =>
+                            _navigateAndAddProducts(context, 'salgado'),
                       ),
                     ),
                   ],
@@ -370,39 +412,50 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
               ],
             ),
           ),
-          
+
           // Área da Lista de Itens (Comanda)
           Expanded(
             child: Container(
-              color: const Color.fromARGB(235, 255, 255, 255), 
+              color: const Color.fromARGB(235, 255, 255, 255),
               child: pedidosProvider.itensPedidoAtual.isEmpty
                   ? const Center(
-                      child: Text(
-                        'Nenhum item adicionado à comanda.', 
-                        style: TextStyle(fontSize: 24, color: Colors.blueGrey) // Increased size
-                      ),
+                      child: Text('Nenhum item adicionado à comanda.',
+                          style: TextStyle(
+                              fontSize: 24,
+                              color: Colors.blueGrey) // Increased size
+                          ),
                     )
                   : ListView.builder(
                       itemCount: pedidosProvider.itensPedidoAtual.length,
                       itemBuilder: (context, index) {
                         final item = pedidosProvider.itensPedidoAtual[index];
                         // Calcula o preço individual do item para exibição na lista
-                        final itemPreco = item.produtoNome.contains('Pastel') 
-                            ? _calcularPrecoPastel(item) 
+                        final itemPreco = item.produtoNome == 'Pastel'
+                            ? _calcularPrecoPastel(item)
                             : item.preco * item.quantidade;
-                        final itemPrecoFormatado = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(itemPreco);
-                        
+                        final itemPrecoFormatado = NumberFormat.currency(
+                                locale: 'pt_BR', symbol: 'R\$')
+                            .format(itemPreco);
+
                         return Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Increased vertical margin
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8), // Increased vertical margin
                           decoration: BoxDecoration(
-                            border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                            border: Border(
+                                bottom:
+                                    BorderSide(color: Colors.grey.shade200)),
                           ),
                           child: ListTile(
-                            leading: Text('${item.quantidade}x', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)), // Increased size
-                            title: Text(
-                              item.produtoNome, 
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 26) // Increased size
-                            ),
+                            leading: Text('${item.quantidade}x',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 22)), // Increased size
+                            title: Text(item.produtoNome,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 26) // Increased size
+                                ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -411,27 +464,38 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4.0),
                                     child: Text(
-                                      'Ingredientes: ${item.ingredientes.join(', ')}', 
-                                      style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 20) // Increased size
-                                    ),
+                                        'Ingredientes: ${item.ingredientes.join(', ')}',
+                                        style: const TextStyle(
+                                            fontStyle: FontStyle.italic,
+                                            fontSize: 20) // Increased size
+                                        ),
                                   ),
                                 // Exibe as observações
                                 if (item.observacoesItem.isNotEmpty)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4.0),
-                                    child: Text(
-                                      'OBS: ${item.observacoesItem}', 
-                                      style: TextStyle(fontStyle: FontStyle.normal, fontSize: 20, color: Colors.red.shade700) // Increased size
-                                    ),
+                                    child: Text('OBS: ${item.observacoesItem}',
+                                        style: TextStyle(
+                                            fontStyle: FontStyle.normal,
+                                            fontSize: 20,
+                                            color: Colors
+                                                .red.shade700) // Increased size
+                                        ),
                                   ),
                               ],
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(itemPrecoFormatado, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)), // Increased size
+                                Text(itemPrecoFormatado,
+                                    style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight:
+                                            FontWeight.bold)), // Increased size
                                 IconButton(
-                                  icon: const Icon(Icons.delete_forever, color: Colors.red, size: 32), // Increased icon size
+                                  icon: const Icon(Icons.delete_forever,
+                                      color: Colors.red,
+                                      size: 32), // Increased icon size
                                   onPressed: () {
                                     pedidosProvider.removerItem(item);
                                   },
@@ -444,7 +508,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                     ),
             ),
           ),
-          
+
           // Rodapé fixo com Subtotal
           Container(
             padding: const EdgeInsets.all(16.0),
@@ -452,7 +516,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.3),
+                  color: Colors.grey.withValues(alpha: 0.3),
                   spreadRadius: 1,
                   blurRadius: 5,
                   offset: const Offset(0, -3),
@@ -462,18 +526,25 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Subtotal:', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black)), // Increased size
-                Text(
-                  subtotalFormatado, 
-                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.deepOrange.shade700) // Increased size
-                ),
+                const Text('Subtotal:',
+                    style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black)), // Increased size
+                Text(subtotalFormatado,
+                    style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.deepOrange.shade700) // Increased size
+                    ),
               ],
             ),
           ),
-          
+
           // Campo de Observações
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             color: Colors.white,
             child: TextField(
               controller: _observacoesController,
@@ -489,7 +560,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomBar(context, pedidosProvider, canConfirm),
+      bottomNavigationBar:
+          _buildBottomBar(context, pedidosProvider, canConfirm),
     );
   }
 }
