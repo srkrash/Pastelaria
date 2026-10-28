@@ -1,0 +1,212 @@
+{
+  "retrieved_on": "2026-10-28",
+  "images": [
+    {
+      "name": "Refrigerante Coca-Cola Lata 350ml",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/182902/6571be2b558925a4e8897b39.jpg?v=638375498715330000",
+      "page": "https://www.bretas.com.br/refrigerante-coca-cola-lata-350ml-1099466/p",
+      "key": "coca_lata",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/coca_lata.jpg",
+      "bytes": 128834,
+      "sha256": "aaf1db24394b1ea4b4f89a55cd2232cd49999dc326166ee6bad9f68899b79858"
+    },
+    {
+      "name": "Refrigerante Coca-Cola sem Açúcar Lata 350ml",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/183491/6571bea7558925a4e8897d25.jpg?v=638375499953630000",
+      "page": "https://www.bretas.com.br/refrigerante-coca-cola-sem-acucar-lata-350ml-1105223/p",
+      "key": "coca_zero_lata",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/coca_zero_lata.jpg",
+      "bytes": 94106,
+      "sha256": "0aafaa89868fb4a3e9c25593abb5856cf6b527f0ae308501246ba746e2ab9990"
+    },
+    {
+      "name": "Refrigerante Coca-Cola Pet 600ml",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/182991/6571be40558925a4e8897b70.jpg?v=638375498920300000",
+      "page": "https://www.bretas.com.br/refrigerante-coca-cola-pet-600ml-1099659/p",
+      "key": "coca_600",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/coca_600.jpg",
+      "bytes": 83463,
+      "sha256": "06f7edc2016c65a18300c2294c760f2bc377af2852011a144b567cb0af8286b8"
+    },
+    {
+      "name": "Refrigerante Coca-Cola Pet 1 Litro",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/183167/6571be69558925a4e8897c0d.jpg?v=638375499332230000",
+      "page": "https://www.bretas.com.br/refrigerante-coca-cola-pet-1-litro-1100687/p",
+      "key": "coca_1l",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/coca_1l.jpg",
+      "bytes": 85446,
+      "sha256": "db394943f2b3e321ad1c1b2579f27f31a3d021f1013d6bdfdd741ca59d872374"
+    },
+    {
+      "name": "Refrigerante Coca-Cola s/ Açúcar Pet 1l",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/183459/6571bea7558925a4e8897d23.jpg?v=638375499952100000",
+      "page": "https://www.bretas.com.br/refrigerante-coca-cola-s--acucar-pet-1l-1105221/p",
+      "key": "coca_zero_1l",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/coca_zero_1l.jpg",
+      "bytes": 76638,
+      "sha256": "2980dd2920533f501e4ca22a7697864468c2a785b5899178a85729dae95c2b0a"
+    },
+    {
+      "name": "Refrigerante Coca-Cola Original Pet 2 Litros",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/192050/6571c5df558925a4e8899eef.jpg?v=638375518430000000",
+      "page": "https://www.bretas.com.br/refrigerante-coca-cola-original-pet-2-litros-1754514/p",
+      "key": "coca_2l",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/coca_2l.jpg",
+      "bytes": 90652,
+      "sha256": "9002ac0ee5d32445bc3eda35062fa8b830b9cdc9433f5014890d8fe2df8d8262"
+    },
+    {
+      "name": "Refrigerante Fanta Laranja Lata 350ml",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/196192/6571c97b558925a4e889af07.jpg?v=638375527664600000",
+      "page": "https://www.bretas.com.br/refrigerante-fanta-laranja-lata-350ml-1098674001/p",
+      "key": "fanta_lata",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/fanta_lata.jpg",
+      "bytes": 111356,
+      "sha256": "caa8589eb309380ece815df750dd397fa5d0ae02dc927e65829501614a371190"
+    },
+    {
+      "name": "Refrigerante Fanta Laranja 1l",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/183300/6571be7e558925a4e8897c6a.jpg?v=638375499542730000",
+      "page": "https://www.bretas.com.br/refrigerante-fanta-laranja-1l-1102025/p",
+      "key": "fanta_1l",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/fanta_1l.jpg",
+      "bytes": 93660,
+      "sha256": "da5ec4e21e8b7a4bcc557a38f6266b49742a278c2ecca14d19ad29cce5b5ead8"
+    },
+    {
+      "name": "Refrigerante Fanta Laranja Pet 2 Litros",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/196225/6571c97b558925a4e889af09.jpg?v=638375527666600000",
+      "page": "https://www.bretas.com.br/refrigerante-fanta-laranja-pet-2-litros-1098678001/p",
+      "key": "fanta_2l",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/fanta_2l.jpg",
+      "bytes": 86156,
+      "sha256": "7f0bca2bbd9b731efd4040687f28cbfbd61fa094fcbd661d2a1bfdfc128c058d"
+    },
+    {
+      "name": "Refrigerante Sprite Original Lata 350ml",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/190663/6571c4ac558925a4e8899947.jpg?v=638375515365330000",
+      "page": "https://www.bretas.com.br/refrigerante-sprite-original-lata-350ml-1742892/p",
+      "key": "sprite_lata",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/sprite_lata.jpg",
+      "bytes": 137143,
+      "sha256": "b499dd52088dcfa8ab9ab2ee07cc5b77dbe83e19fb9588353fdb7a20546bacda"
+    },
+    {
+      "name": "Refrigerante Mineiro Guaraná Lata 350ml",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/185755/6571c095558925a4e889864c.jpg?v=638375504889800000",
+      "page": "https://www.bretas.com.br/refrigerante-mineiro-guarana-lata-350ml-1427449/p",
+      "key": "mineiro_lata",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/mineiro_lata.jpg",
+      "bytes": 136656,
+      "sha256": "367f261f6b90f833afc6f59ac5092c09690188fd4ced549d19aaf1bdcabd16cf"
+    },
+    {
+      "name": "Refrigerante Mineiro Tradicional Pet 600ml",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/185581/6571c06c558925a4e8898574.jpg?v=638375504480230000",
+      "page": "https://www.bretas.com.br/refrigerante-mineiro-tradicional-pet-600ml-1425069/p",
+      "key": "mineiro_600",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/mineiro_600.jpg",
+      "bytes": 98113,
+      "sha256": "39d27eeab821b17f8c0d2766dce653f45a41ce8c90873e0e0f2766cede6a5530"
+    },
+    {
+      "name": "Refrigerante Mineiro Guaraná Tradicional Pet 2 Litros",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/185878/6571c0aa558925a4e889869d.jpg?v=638375505099670000",
+      "page": "https://www.bretas.com.br/refrigerante-mineiro-guarana-tradicional-pet-2-litros-1428576/p",
+      "key": "mineiro_2l",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/mineiro_2l.jpg",
+      "bytes": 127155,
+      "sha256": "493d75cfbf178e1633c9a0658291f470abe653e391d1cd1ffd0eff1168dfd0e2"
+    },
+    {
+      "name": "Refrigerante Mineiro Guaraná Pet 250ml",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/185737/6571c095558925a4e889864e.jpg?v=638375504889370000",
+      "page": "https://www.bretas.com.br/refrigerante-mineiro-guarana-pet-250ml-1427485/p",
+      "key": "mineiro_250",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/mineiro_250.jpg",
+      "bytes": 106209,
+      "sha256": "1a6e3622377896c05332d3625c0d148e34bc9287e65dc60d25587d4751e28ef4"
+    },
+    {
+      "name": "Amstel Cerveja Lager Lata 350ml",
+      "url": "https://cdn.shopify.com/s/files/1/0728/0161/5960/files/7896045504831_0-353f00ea-65f0-41fd-9a51-2e86b84eea4b_7f4a47af-d51b-4e21-a5b0-a6b4c828e11e.jpg?v=1784585427",
+      "key": "amstel_lata",
+      "source_catalog": "https://express.heineken.com.br/collections/cervejas",
+      "asset": "assets/bebidas/amstel_lata.jpg",
+      "bytes": 75672,
+      "sha256": "edd69cfbd2b12d09180fcfc5aea214e35c3ef40bfe31fe9c0d8d56fcf6012171"
+    },
+    {
+      "name": "Heineken Cerveja Lata 350ml",
+      "url": "https://cdn.shopify.com/s/files/1/0728/0161/5960/files/7896045523412_0-b2f37338-1a74-4c7c-8a46-285f04f09f4a.jpg?v=1784310120",
+      "key": "heineken_lata",
+      "source_catalog": "https://express.heineken.com.br/collections/cervejas",
+      "asset": "assets/bebidas/heineken_lata.jpg",
+      "bytes": 81007,
+      "sha256": "69c2f79e17bdb0d7396f495c9c9ad945f57a31ff3673c245b56fc6c77a62d606"
+    },
+    {
+      "name": "Cerveja Skol Pilsen Lata 350ml",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/182894/6571be2b558925a4e8897af6.jpg?v=638375498715000000",
+      "page": "https://www.bretas.com.br/cerveja-skol-pilsen-lata-350ml-1099182/p",
+      "key": "skol_lata",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/skol_lata.jpg",
+      "bytes": 118814,
+      "sha256": "6e96af987141adca5281408c3ac2b5d1b4e4f5f70b0f018f421e479d9ac1c506"
+    },
+    {
+      "name": "Cerveja Brahma Chopp Pilsen Lata 350ml",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/182935/6571be2b558925a4e8897b0b.jpg?v=638375498737470000",
+      "page": "https://www.bretas.com.br/cerveja-brahma-chopp-pilsen-lata-350ml-1099264/p",
+      "key": "brahma_lata",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/brahma_lata.jpg",
+      "bytes": 212126,
+      "sha256": "7661f4d495aa9dffb03f46eb71f0b4c58b5d4695ddc7d99bd3b6afcccdb6afd9"
+    },
+    {
+      "name": "Cerveja Antarctica Pilsen Lata 350ml",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/183073/6571be55558925a4e8897bd4.jpg?v=638375499138800000",
+      "page": "https://www.bretas.com.br/cerveja-antarctica-pilsen-lata-350ml-1100232/p",
+      "key": "antarctica_lata",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/antarctica_lata.jpg",
+      "bytes": 202540,
+      "sha256": "5a9ee1eff00e2f7b9c3fb18ec13d2231f646fdb77e2f5a590536d733155c2522"
+    },
+    {
+      "name": "Energético Extra Power Latão 473ml",
+      "url": "https://bretas.vteximg.com.br/arquivos/ids/183578/6571bebc558925a4e8897d90.jpg?v=638375500160300000",
+      "page": "https://www.bretas.com.br/energetico-extra-power-latao-473ml-1108712/p",
+      "key": "extra_power",
+      "source_catalog": "https://www.bretas.com.br",
+      "asset": "assets/bebidas/extra_power.jpg",
+      "bytes": 95376,
+      "sha256": "cebc460b055116ae3a1c91846c15ca6856d89cbf9a86c8d4a5f72b07393dcc76"
+    },
+    {
+      "name": "Guaraná Mineiro garrafa 200ml",
+      "key": "mineiro_200",
+      "url": "https://static.wixstatic.com/media/220800_a92a9bb0f31d4d98b2c84524c397f61a~mv2.png/v1/fit/w_485%2Ch_485%2Cq_90/220800_a92a9bb0f31d4d98b2c84524c397f61a~mv2.png",
+      "page": "https://www.guaranamineiro.ind.br/guarana-mineiro",
+      "asset": "assets/bebidas/mineiro_200.png",
+      "bytes": 69868,
+      "sha256": "55ef8917eb876d537c89f95c69586c2c1b238a5004062e42a091c673852e3abc"
+    }
+  ]
+}

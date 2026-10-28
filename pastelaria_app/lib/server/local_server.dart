@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'order_store.dart';
+import 'bi_service.dart';
 
 class LocalServer {
   final OrderStore store;
@@ -55,6 +56,11 @@ class LocalServer {
         result = {'protocol': 2, 'server': 'pastelaria-tablet'};
       } else if (r.method == 'GET' && r.uri.path == '/produtos') {
         result = await store.products(r.uri.queryParameters['tipo']);
+      } else if (r.method == 'GET' && r.uri.path == '/catalogo/precos') {
+        result = await store.priceCatalog();
+      } else if (r.method == 'GET' && r.uri.path == '/bi') {
+        result = await BiService(store)
+            .report(r.uri.queryParameters['from'], r.uri.queryParameters['to']);
       } else if (r.method == 'GET' && r.uri.path == '/snapshot') {
         result = await store.snapshot(activeOnly: true);
       } else if (r.method == 'GET' && r.uri.path == '/pedidos/hoje') {
@@ -77,6 +83,11 @@ class LocalServer {
           bytes.addAll(chunk);
         }
         final body = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+        if (body['action'] == 'clear_today_tests' &&
+            r.connectionInfo?.remoteAddress.isLoopback != true) {
+          throw BusinessError(
+              'Limpeza disponível somente no tablet principal.', 403);
+        }
         result = await store.command(
             body['command_id'] as String,
             body['action'] as String,

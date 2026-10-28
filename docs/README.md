@@ -10,6 +10,15 @@ Documentação inicial em 23/10/2026, preparada para orientar o desenvolvimento 
 4. [Orientações para agentes](../AGENTS.md): regras aplicáveis às alterações no repositório.
 5. [Implementação da versão 2](IMPLEMENTACAO-V2.md): ambiente, funcionalidades implementadas, instalação e limitações reais.
 6. [Revisão de interface 2.1.0](REVISAO-DE-INTERFACE.md): análise de usabilidade, melhorias aplicadas e validação das telas.
+7. [Preparação da migração PostgreSQL → SQLite](MIGRACAO-POSTGRESQL.md): cópia consistente do legado, encerramento do histórico na cópia e restauração no tablet.
+8. [BI e cozinha na versão 2.2.0](BI-E-COZINHA.md): indicadores, gráficos por período e montagem orientada pelo próximo pastel.
+9. [Preços dos produtos na versão 2.3.0](PRECOS-DOS-PRODUTOS.md): edição ocasional de valores, regras dos pastéis e proteção do histórico.
+10. [Bebidas e imagens na versão 2.4.0](BEBIDAS-E-IMAGENS.md): categorias, fotos offline e seleção entre grupos.
+10. [Correção de impressão da TP-650](CORRECAO-IMPRESSAO-TP650.md): comando de avanço/corte, regressão TCP e validação física pendente.
+11. [PIX no cupom](PIX-NO-CUPOM.md): QR Code com o total do pedido, configuração local e teste direto pelo computador.
+12. [Atualização 2.4.1](ATUALIZACAO-2.4.1.md): instalação no servidor e limpeza explícita de pedidos de teste do dia.
+13. [Ações rápidas na versão 2.4.3](ACOES-RAPIDAS-COZINHA-ENTREGA.md): preparo do saldo em um toque e entrega completa após preparo.
+14. [Recheio adicional na versão 2.4.4](RECHEIO-ADICIONAL.md): nome livre, preço sugerido pelo cadastro e cobrança por pastel.
 
 ## Como interpretar
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/item_pedido.dart';
+import '../models/pricing_rules.dart';
+import '../models/pastel_extra.dart';
 
 const ink = Color(0xFF182D2A);
 const mutedInk = Color(0xFF566862);
@@ -61,17 +63,12 @@ ThemeData appTheme({String? fontFamily}) => ThemeData(
 
 String money(int cents) =>
     NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(cents / 100);
-int pastelUnitCents(List<String> ingredients) {
-  if (ingredients.length == 1 && ingredients.single == 'Pizza') return 1500;
-  if (ingredients.length == 1 && ingredients.single == 'Misto') return 2500;
-  final count = ingredients
-      .where((s) => !['Cebola', 'Cebolinha', 'Orégano'].contains(s))
-      .length;
-  return 1200 + (count > 2 ? (count - 2) * 300 : 0);
-}
+int pastelUnitCents(List<String> ingredients,
+        {PricingRules rules = const PricingRules()}) =>
+    rules.pastel(ingredients);
 
 int itemUnitCents(ItemPedido item) => item.produtoNome == 'Pastel'
-    ? pastelUnitCents(item.ingredientes)
+    ? pastelUnitCents(item.ingredientes) + extraUnitCents(item.adicionais)
     : (item.preco * 100).round();
 
 class SurfaceCard extends StatelessWidget {

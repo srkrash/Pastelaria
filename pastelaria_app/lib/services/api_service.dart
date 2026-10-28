@@ -62,8 +62,24 @@ class ApiService {
 
   Future<Map<String, dynamic>> snapshot() async =>
       Map<String, dynamic>.from(await request('/snapshot') as Map);
+  Future<Map<String, dynamic>> getPriceCatalog() async {
+    try {
+      return Map<String, dynamic>.from(
+          await request('/catalogo/precos') as Map);
+    } on ApiException catch (error) {
+      if (error.status == 404) {
+        throw ApiException(
+            'Atualize primeiro o tablet principal para a versão 2.3.0 ou superior para carregar os preços.',
+            404);
+      }
+      rethrow;
+    }
+  }
+
   Future<List<dynamic>> getPedidosHoje() async =>
       await request('/pedidos/hoje') as List;
+  Future<Map<String, dynamic>> getBi(String from, String to) async =>
+      Map<String, dynamic>.from(await request('/bi?from=$from&to=$to') as Map);
   Future<Map<String, dynamic>> getPedidoPorId(int id) async =>
       Map<String, dynamic>.from(await request('/pedidos/$id') as Map);
   Future<List<dynamic>> getProdutos({String? tipo}) async => await request(
@@ -147,7 +163,10 @@ class ApiService {
       await prefs.remove('pending_create_v2');
       return result;
     } on ApiException catch (e) {
-      if (e.status == 400 || e.status == 413) {
+      if (e.status == 400 ||
+          e.status == 410 ||
+          e.status == 413 ||
+          e.status == 422) {
         await prefs.remove('pending_create_v2');
       }
       rethrow;
@@ -164,6 +183,17 @@ class ApiService {
           'item_id': itemId,
           'quantidade': count,
           'expected_revision': order['revision']
+        },
+        commandId: commandId);
+  }
+
+  Future<void> deliverOrder(Map<String, dynamic> order,
+      {String? commandId}) async {
+    await command(
+        'deliver_all',
+        {
+          'pedido_id': order['pedido_id'],
+          'expected_revision': order['revision'],
         },
         commandId: commandId);
   }

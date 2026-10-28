@@ -8,6 +8,7 @@ import '../services/app_settings.dart';
 import '../services/api_service.dart';
 import '../server/server_runtime.dart';
 import '../server/backup_service.dart';
+import '../server/pix_payment.dart';
 
 class ConfigScreen extends StatefulWidget {
   const ConfigScreen({super.key});
@@ -20,6 +21,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
   final _secret = TextEditingController();
   final _printer = TextEditingController();
   final _port = TextEditingController(text: '9100');
+  final _pixPhone = TextEditingController();
+  final _pixName = TextEditingController();
+  final _pixCity = TextEditingController();
+  bool _pixEnabled = false;
   bool _host = false, _busy = true, _showSecret = false;
   String _role = 'pedido';
   String _ips = '';
@@ -46,6 +51,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _secret.text = s.secret;
       _printer.text = s.printerAddress;
       _port.text = '${s.printerPort}';
+      _pixEnabled = s.pixEnabled;
+      _pixPhone.text = s.pixPhone;
+      _pixName.text = s.pixName;
+      _pixCity.text = s.pixCity;
       _ips = ips;
       _busy = false;
     });
@@ -65,6 +74,17 @@ class _ConfigScreenState extends State<ConfigScreen> {
           content: Text('Confira IPs, porta e chave (mínimo 16 caracteres).')));
       return;
     }
+    if (_host && _pixEnabled) {
+      try {
+        PixConfiguration(
+                phone: _pixPhone.text, name: _pixName.text, city: _pixCity.text)
+            .validate();
+      } on FormatException catch (e) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+        return;
+      }
+    }
     setState(() => _busy = true);
     final provider = context.read<PedidosProvider>();
     final old = await AppSettings.load();
@@ -74,6 +94,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
         secret: secret,
         printerAddress: _printer.text.trim(),
         printerPort: port,
+        pixEnabled: _pixEnabled,
+        pixPhone: _pixPhone.text.trim(),
+        pixName: _pixName.text.trim(),
+        pixCity: _pixCity.text.trim(),
         role: _role);
     try {
       await ServerRuntime.instance.configure(s);
@@ -304,9 +328,72 @@ class _ConfigScreenState extends State<ConfigScreen> {
     }
   }
 
+  Future<void> _clearTodayTests() async {
+    final runtime = ServerRuntime.instance;
+    final store = runtime.store;
+    if (store == null) return;
+    try {
+      final day = store.day;
+      final snapshot = await store.snapshot(today: true);
+      final count = (snapshot['pedidos'] as List).length;
+      if (!mounted) return;
+      if (count == 0) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Nenhum pedido de hoje para apagar.')));
+        return;
+      }
+      final confirm = await showDialog<bool>(
+          context: context,
+          builder: (c) => AlertDialog(
+                title: const Text('Apagar pedidos de teste de hoje?'),
+                content: Text(
+                    'Apagar definitivamente $count pedidos de $day e suas impressões. '
+                    'Use somente se TODOS os pedidos de hoje foram testes. '
+                    'Catálogo, preços e histórico anterior serão preservados. Não será feito backup por esta ação.'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(c, false),
+                      child: const Text('Voltar')),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(c, true),
+                      child: const Text('Apagar testes de hoje')),
+                ],
+              ));
+      if (confirm != true || !mounted) return;
+      setState(() => _busy = true);
+      final result = await runtime.clearTodayTests({
+        'expected_day': day,
+        'expected_revision': snapshot['revision'],
+        'expected_count': count,
+      });
+      if (!mounted) return;
+      await context.read<PedidosProvider>().refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content:
+                Text('${result['deleted_count']} pedidos de teste apagados.')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Não foi possível limpar: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   void dispose() {
-    for (final c in [_address, _secret, _printer, _port]) {
+    for (final c in [
+      _address,
+      _secret,
+      _printer,
+      _port,
+      _pixPhone,
+      _pixName,
+      _pixCity
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -460,6 +547,38 @@ class _ConfigScreenState extends State<ConfigScreen> {
                                   'Sem impressora configurada, os pedidos ficam salvos e a impressão aguarda.',
                                   style: TextStyle(color: mutedInk)),
                             ]),
+                            const SizedBox(height: 18),
+                            _section('PIX no cupom', Icons.qr_code, [
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('Imprimir QR Code PIX'),
+                                subtitle: const Text(
+                                    'Usa o valor total do pedido. O recebimento deve ser conferido no banco.'),
+                                value: _pixEnabled,
+                                onChanged: (value) =>
+                                    setState(() => _pixEnabled = value),
+                              ),
+                              if (_pixEnabled) ...[
+                                TextField(
+                                    controller: _pixPhone,
+                                    keyboardType: TextInputType.phone,
+                                    decoration: const InputDecoration(
+                                        labelText:
+                                            'Chave PIX celular com DDD')),
+                                const SizedBox(height: 16),
+                                TextField(
+                                    controller: _pixName,
+                                    decoration: const InputDecoration(
+                                        labelText:
+                                            'Nome do beneficiário (até 25 caracteres)')),
+                                const SizedBox(height: 16),
+                                TextField(
+                                    controller: _pixCity,
+                                    decoration: const InputDecoration(
+                                        labelText:
+                                            'Cidade, sem estado (até 15 caracteres)')),
+                              ],
+                            ]),
                           ],
                           const SizedBox(height: 18),
                           _section('Acompanhamento e recuperação',
@@ -476,6 +595,13 @@ class _ConfigScreenState extends State<ConfigScreen> {
                                 label: const Text(
                                     'Resolver pedido com confirmação pendente')),
                             if (ServerRuntime.instance.store != null) ...[
+                              const SizedBox(height: 10),
+                              OutlinedButton.icon(
+                                onPressed: _clearTodayTests,
+                                icon: const Icon(Icons.delete_sweep_outlined),
+                                label: const Text(
+                                    'Limpar pedidos de teste de hoje'),
+                              ),
                               const SizedBox(height: 18),
                               const Divider(),
                               const SizedBox(height: 12),

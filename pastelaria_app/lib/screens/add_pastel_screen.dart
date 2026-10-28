@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../ui/app_ui.dart';
+import '../models/pricing_rules.dart';
+import '../models/pastel_extra.dart';
 
 enum PastelType { none, pizza, misto }
 
 class AddPastelScreen extends StatefulWidget {
-  const AddPastelScreen({super.key});
+  final PricingRules pricing;
+  const AddPastelScreen({super.key, this.pricing = const PricingRules()});
   @override
   State<AddPastelScreen> createState() => _AddPastelScreenState();
 }
@@ -27,9 +30,17 @@ class _AddPastelScreenState extends State<AddPastelScreen> {
     'Orégano'
   ];
   final Set<String> _selected = {};
+  final List<PastelExtra> _extras = [];
   final _notes = TextEditingController();
   int _quantity = 1;
   PastelType _type = PastelType.none;
+  Future<void> _addExtra() async {
+    final extra = await showDialog<PastelExtra>(
+        context: context,
+        builder: (_) => _ExtraDialog(defaultCents: widget.pricing.extra));
+    if (extra != null && mounted) setState(() => _extras.add(extra));
+  }
+
   List<String> get _filling => _type == PastelType.pizza
       ? ['Pizza']
       : _type == PastelType.misto
@@ -109,7 +120,8 @@ class _AddPastelScreenState extends State<AddPastelScreen> {
   @override
   Widget build(BuildContext context) {
     final filling = _filling;
-    final unit = pastelUnitCents(filling);
+    final unit = pastelUnitCents(filling, rules: widget.pricing) +
+        extraUnitCents(_extras);
     return Scaffold(
       appBar: AppBar(title: const Text('Escolher recheios')),
       body: SingleChildScrollView(
@@ -146,16 +158,18 @@ class _AddPastelScreenState extends State<AddPastelScreen> {
                         const SizedBox(height: 20),
                         SegmentedButton<PastelType>(
                             showSelectedIcon: false,
-                            segments: const [
-                              ButtonSegment(
+                            segments: [
+                              const ButtonSegment(
                                   value: PastelType.none,
                                   label: Text('Personalizado')),
                               ButtonSegment(
                                   value: PastelType.pizza,
-                                  label: Text('Pizza · R\$ 15')),
+                                  label: Text(
+                                      'Pizza · ${money(widget.pricing.pizza)}')),
                               ButtonSegment(
                                   value: PastelType.misto,
-                                  label: Text('Misto · R\$ 25'))
+                                  label: Text(
+                                      'Misto · ${money(widget.pricing.misto)}'))
                             ],
                             selected: {_type},
                             onSelectionChanged: (s) =>
@@ -166,9 +180,10 @@ class _AddPastelScreenState extends State<AddPastelScreen> {
                               style: TextStyle(
                                   fontSize: 20, fontWeight: FontWeight.w700)),
                           const SizedBox(height: 6),
-                          const Text(
-                              'Até 2 recheios pagos: R\$ 12. Cada adicional: R\$ 3. Temperos indicados são gratuitos.',
-                              style: TextStyle(color: mutedInk, fontSize: 16)),
+                          Text(
+                              'Até 2 recheios pagos: ${money(widget.pricing.base)}. Cada adicional: ${money(widget.pricing.extra)}. Temperos indicados são gratuitos.',
+                              style: const TextStyle(
+                                  color: mutedInk, fontSize: 16)),
                           const SizedBox(height: 14),
                           LayoutBuilder(
                               builder: (context, c) =>
@@ -216,6 +231,27 @@ class _AddPastelScreenState extends State<AddPastelScreen> {
                                       : filling.join(' · '),
                                   style: const TextStyle(
                                       fontSize: 18, color: mutedInk)),
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                  onPressed: _addExtra,
+                                  icon: const Icon(Icons.add_circle_outline),
+                                  label: const Text('Recheio adicional')),
+                              for (final extra in _extras)
+                                Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Row(children: [
+                                      Expanded(
+                                          child: Text(
+                                              'Adicional: ${extra.description}',
+                                              style: const TextStyle(
+                                                  fontSize: 18, color: brand))),
+                                      IconButton(
+                                          tooltip:
+                                              'Remover adicional ${extra.name}',
+                                          onPressed: () => setState(
+                                              () => _extras.remove(extra)),
+                                          icon: const Icon(Icons.close)),
+                                    ])),
                               const SizedBox(height: 16),
                               TextField(
                                   controller: _notes,
@@ -250,6 +286,9 @@ class _AddPastelScreenState extends State<AddPastelScreen> {
                         : () => Navigator.pop(context, {
                               'quantidade': _quantity,
                               'ingredientes': filling,
+                              'adicionais': _extras
+                                  .map((extra) => extra.toJson())
+                                  .toList(),
                               'observacoesItem': _notes.text.trim()
                             }),
                     icon: const Icon(Icons.add),
@@ -258,4 +297,93 @@ class _AddPastelScreenState extends State<AddPastelScreen> {
               ]))),
     );
   }
+}
+
+class _ExtraDialog extends StatefulWidget {
+  final int defaultCents;
+  const _ExtraDialog({required this.defaultCents});
+  @override
+  State<_ExtraDialog> createState() => _ExtraDialogState();
+}
+
+class _ExtraDialogState extends State<_ExtraDialog> {
+  final _form = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  late final _price = TextEditingController(
+      text:
+          '${widget.defaultCents ~/ 100},${(widget.defaultCents % 100).toString().padLeft(2, '0')}');
+  @override
+  void dispose() {
+    _name.dispose();
+    _price.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('Recheio adicional'),
+        content: SingleChildScrollView(
+            child: SizedBox(
+                width: 420,
+                child: Form(
+                    key: _form,
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      TextFormField(
+                          key: const ValueKey('extra-name'),
+                          controller: _name,
+                          autofocus: true,
+                          maxLength: 80,
+                          decoration: const InputDecoration(
+                              labelText: 'Nome do adicional',
+                              errorMaxLines: 3,
+                              hintText: 'Ex.: camarão, queijo extra'),
+                          validator: (value) {
+                            try {
+                              PastelExtra.fromJson(
+                                  {'nome': value, 'preco_centavos': 0});
+                              return null;
+                            } on FormatException catch (error) {
+                              return error.message;
+                            }
+                          }),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                          key: const ValueKey('extra-price'),
+                          controller: _price,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          decoration: const InputDecoration(
+                              labelText: 'Valor por pastel (R\$)',
+                              helperMaxLines: 3,
+                              errorMaxLines: 3,
+                              helperText:
+                                  'Valor sugerido pelo cadastro. Pode ajustar para este item.'),
+                          validator: (value) => PricingRules.parsePrice(
+                                      value ?? '') ==
+                                  null
+                              ? 'Informe de 0,00 a 9.999,99, com até duas casas decimais.'
+                              : null),
+                      const SizedBox(height: 12),
+                      const Text(
+                          'O valor será cobrado em cada pastel deste item.',
+                          style: TextStyle(color: mutedInk)),
+                    ])))),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () {
+                if (_form.currentState!.validate()) {
+                  Navigator.pop(
+                      context,
+                      PastelExtra.fromJson({
+                        'nome': _name.text,
+                        'preco_centavos': PricingRules.parsePrice(_price.text)!
+                      }));
+                }
+              },
+              child: const Text('Adicionar recheio')),
+        ],
+      );
 }

@@ -18,6 +18,17 @@ import 'package:pastelaria_app/screens/editar_pedido_selecionado.dart';
 import 'package:pastelaria_app/ui/app_ui.dart';
 
 class UiApi extends ApiService {
+  @override
+  Future<Map<String, dynamic>> getPriceCatalog() async => {
+        'catalog_revision': 0,
+        'rules': {
+          'base_centavos': 1200,
+          'adicional_centavos': 300,
+          'pizza_centavos': 1500,
+          'misto_centavos': 2500
+        },
+        'products': await getProdutos(),
+      };
   final List<dynamic> orders;
   Map<String, dynamic>? sent;
   int cancelled = 0;
@@ -202,7 +213,7 @@ void main() {
     p.adicionarItem(draftItem());
     p.draftNotes = 'Separar embalagens';
     addTearDown(p.dispose);
-    await mount(tester, const NovoPedidoScreen(), p);
+    await mount(tester, NovoPedidoScreen(api: UiApi()), p);
     expect(find.text(money(2400)), findsWidgets);
     await tester.tap(find.byTooltip('Aumentar Pastel'));
     await tester.pumpAndSettle();
@@ -222,7 +233,7 @@ void main() {
     final p = PedidosProvider(api: UiApi());
     p.adicionarItem(draftItem());
     addTearDown(p.dispose);
-    await mount(tester, const NovoPedidoScreen(), p,
+    await mount(tester, NovoPedidoScreen(api: UiApi()), p,
         size: const Size(600, 960), scale: 1.3);
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
     addTearDown(tester.view.resetViewInsets);

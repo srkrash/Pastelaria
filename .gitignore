@@ -10,4 +10,6 @@ __pycache__/
 **/key.properties
 *.log
 /tools/
+/private-migration/
 **/.kotlin/
+/tmp-tanca-setup/

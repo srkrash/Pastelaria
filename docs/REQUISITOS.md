@@ -2,6 +2,20 @@
 
 ## 1. Objetivo e ambiente
 
+**Confirmado em 28/10/2026:** organizar bebidas por categoria e voltar a usar
+imagens dos produtos. Mineirinho 200 ml e 250 ml são Guaraná Mineiro. Ver
+[bebidas e imagens](BEBIDAS-E-IMAGENS.md).
+
+**Confirmado em 28/10/2026:** incluir tela para alterar preços dos produtos, usada
+ocasionalmente, acessível por um botão/menu discreto. Ver
+[edição de preços](PRECOS-DOS-PRODUTOS.md).
+
+**Confirmado em 28/10/2026:** incluir BI no aplicativo, com visões diária, semanal,
+mensal e por hora, usando o histórico. A cozinha deve destacar o próximo pastel
+a montar, recheios e quantidades para reduzir confusão, com apresentação própria
+em relação à entrega. Implementação e regras dos indicadores em
+[BI e cozinha](BI-E-COZINHA.md).
+
 **Confirmado:** facilitar a criação, a fabricação e a entrega de pedidos em um trailer de feira. A operação usa três tablets, roteador OpenWrt, internet Starlink, sistema de senhas e impressora Tanca TP-650.
 
 **Diretriz da arquitetura escolhida:** a operação ocorre na rede local mesmo sem internet. Queda da Starlink não equivale a queda do Wi-Fi ou do tablet servidor; são falhas diferentes e devem aparecer assim para o operador.
@@ -29,6 +43,12 @@ O papel de interface não deve ficar preso ao IP do equipamento. É necessário 
 ## 3. Pedido e catálogo
 
 ### REQ-01 — Montagem do pedido
+
+**Confirmado em 28/10/2026:** incluir botão “Recheio adicional” na montagem do
+pastel, com nome livre e valor por pastel. O valor inicial do campo é o adicional
+já configurado no cadastro; o atendente pode ajustá-lo nessa montagem. Multiplicar
+pela quantidade do item e preservar nome/valor histórico. Não substituir a regra
+dos recheios comuns incluídos. Ver [recheio adicional](RECHEIO-ADICIONAL.md).
 
 - Selecionar pastéis por sabor, salgados e bebidas, com quantidades.
 - Preservar as personalizações e regras de adicionais do legado que forem confirmadas com o responsável.
@@ -60,6 +80,11 @@ O reinício diário deve funcionar mesmo com tablet desligado à meia-noite: no 
 
 ### REQ-03 — Nova tela da cozinha
 
+**Confirmado em 28/10/2026:** o botão principal “Definir como pronto” conclui
+todo o saldo do item exibido em um toque, sem confirmação. Preservar as unidades
+já prontas/entregues; outros itens não são concluídos implicitamente. A produção
+parcial continua disponível por uma ação secundária de quantidade.
+
 **Confirmado:** a tela atual não é usada porque a experiência não ficou boa. Criar uma tela parecida com a entrega, adaptada à produção.
 
 **Confirmado:** permitir produção parcial. Proposta de interação: em cada item/sabor, escolher quantas unidades ficaram prontas, com atalho para concluir o saldo. Mostrar total solicitado, pronto acumulado e saldo a produzir, sem juntar itens com personalizações diferentes.
@@ -82,6 +107,12 @@ Critério de aceite: um pedido com sabores distintos e observações deve ser co
 ## 5. Entrega
 
 ### REQ-04 — Fila compartilhada e confiável
+
+**Confirmado em 28/10/2026:** incluir “Entregar tudo” à direita da senha no
+cabeçalho do pedido. Habilitar somente quando todos os pastéis estiverem prontos.
+A ação entrega todos os saldos do pedido (inclusive bebidas/salgados), sem
+confirmação por item, em uma transação idempotente validada pelo servidor.
+Preservar a entrega parcial e não converter unidades pendentes em prontas.
 
 - Todos os clientes com a mesma configuração de filtro devem representar o mesmo estado persistido.
 - Um cliente abrir a fila não consome, reserva ou oculta pedidos para outro.
@@ -114,6 +145,11 @@ Comandos de incremento/conclusão devem ser atômicos e idempotentes, com histó
 
 ### REQ-05 — Tanca TP-650
 
+**Confirmado em 28/10/2026:** incluir QR Code PIX no cupom, com o total do pedido,
+chave celular e dados do beneficiário configurados localmente. Imprimir após o
+total e manter uma linha extra de margem inferior. Não implica confirmação
+automática de pagamento. Ver [PIX no cupom](PIX-NO-CUPOM.md).
+
 - Preservar pedido e produção mesmo se a impressão falhar.
 - Manter fila persistente com tentativas e erro visível.
 - Distinguir pendente, envio em andamento, enviado, falha e resultado incerto quando aplicável.
@@ -143,6 +179,11 @@ Comandos de incremento/conclusão devem ser atômicos e idempotentes, com histó
 **Pendências:** provedor/conta, retenção, responsável pela chave, perda de dados aceitável e tempo de recuperação desejado. Backup diário pode perder todo o trabalho posterior à última cópia; confirmar necessidade de cópias durante o expediente.
 
 ## 9. Operação e qualidade
+
+**Confirmado em 28/10/2026 para a migração:** importar todo o catálogo e histórico
+do PostgreSQL; encerrar os pedidos antigos na cópia destinada ao SQLite do tablet,
+mantendo cancelados e o registro dos status originais. O PostgreSQL de origem fica
+preservado. Procedimento e validação em [migração](MIGRACAO-POSTGRESQL.md).
 
 - Diferenciar internet indisponível, servidor inacessível, dados desatualizados e impressora indisponível.
 - Sem servidor, preservar rascunho e informar indisponibilidade; não confirmar pedidos localmente como se estivessem na cozinha.

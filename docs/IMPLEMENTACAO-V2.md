@@ -1,5 +1,36 @@
 # Versão 2 — servidor no APK
 
+## Validação para integração em 28/10/2026
+
+Estado 2.4.4+208: `scripts/flutter.ps1 analyze` sem apontamentos e
+`scripts/flutter.ps1 test` com 85 testes aprovados e 3 ignorados por dependerem
+de histórico, backup ou exportação privados locais. Os 3 testes sintéticos de
+`python -m unittest discover -s scripts -p test_prepare_legacy_migration.py`
+também passaram. `git diff --cached --check` sem erros. Esta rodada não incluiu
+novo ensaio físico nos tablets ou na impressora. Utilitários temporários da
+impressora, bancos e exportações privadas ficam fora do versionamento.
+
+## Histórico de implementação
+
+**Versão 2.4.0 em 28/10/2026:** bebidas organizadas por categorias, busca global,
+seleção preservada entre grupos e 21 fotos locais no APK. Ver
+[biblioteca e validação](BEBIDAS-E-IMAGENS.md).
+
+**Versão 2.3.0 em 28/10/2026:** tela de edição de preços no menu Mais opções,
+regras de pastéis configuráveis e conferência de preços antes da confirmação,
+preservando o histórico. Ver [preços dos produtos](PRECOS-DOS-PRODUTOS.md).
+
+**Versão 2.2.0 em 28/10/2026:** BI local com indicadores e gráficos por período e
+cozinha com o próximo item destacado, recheios, quantidades e sequência de
+montagem. Ver [funcionalidades e critérios dos indicadores](BI-E-COZINHA.md).
+
+**Preparação em 28/10/2026:** catálogo e histórico do PostgreSQL local foram
+convertidos para SQLite em uma cópia separada, com os pedidos antigos encerrados
+conforme autorização do responsável. O banco original foi preservado. Há backup
+protegido compatível com a restauração do app; consulte
+[roteiro e validação](MIGRACAO-POSTGRESQL.md). A instalação nos tablets ainda não foi
+executada. As limitações históricas abaixo descrevem a implementação inicial.
+
 **Revisão de telas 2.1.0:** navegação, atendimento, montagem, seleção de produtos, filas, consulta e configurações foram reorganizados. Veja a [análise de interface](REVISAO-DE-INTERFACE.md). A suíte agora possui 25 testes; os resultados da implementação inicial abaixo permanecem como histórico.
 
 Implementação iniciada em 23/10/2026, branch `codex/servidor-tablet`. O Git já existia; não foi reinicializado.

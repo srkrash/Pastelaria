@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/app_settings.dart';
+import '../services/api_service.dart';
 import 'local_server.dart';
 import 'order_store.dart';
 import 'printer_worker.dart';
@@ -29,6 +30,21 @@ class ServerRuntime {
     final key = BackupService.newKey();
     await prefs.setString('backup_key_v2', key);
     return key;
+  }
+
+  Future<Map<String, dynamic>> clearTodayTests(
+      Map<String, dynamic> preview) async {
+    if (store == null) throw StateError('Use o tablet principal.');
+    final printer = _printer;
+    await printer?.stop();
+    try {
+      return await ApiService().command('clear_today_tests', {
+        ...preview,
+        'confirmation': 'APAGAR TESTES DE HOJE',
+      });
+    } finally {
+      await printer?.start();
+    }
   }
 
   Future<File> backupNow() {
@@ -87,8 +103,9 @@ class ServerRuntime {
               as List);
       server = LocalServer(store!, settings.secret);
       await server!.start();
-      _printer =
-          PrinterWorker(store!, settings.printerAddress, settings.printerPort);
+      _printer = PrinterWorker(
+          store!, settings.printerAddress, settings.printerPort,
+          pix: settings.pix);
       await _printer!.start();
       unawaited(backupNow().then<void>((_) {}, onError: (Object _) {}));
       _backupTimer = Timer.periodic(const Duration(hours: 1), (_) {

@@ -8,6 +8,8 @@ import 'pedido_screen.dart';
 import 'fila_entrega_screen.dart';
 import 'config_screen.dart';
 import 'log_screen.dart';
+import 'bi_screen.dart';
+import 'product_prices_screen.dart';
 
 class MainScreen extends StatefulWidget {
   final String initialRole;
@@ -80,6 +82,11 @@ class _MainScreenState extends State<MainScreen> {
                   ? Icons.wifi_off
                   : Icons.check_circle_outline),
           IconButton(
+              tooltip: 'BI e relatórios',
+              onPressed: () => Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => const BiScreen())),
+              icon: const Icon(Icons.bar_chart_outlined)),
+          IconButton(
               tooltip: 'Configurações',
               onPressed: _configure,
               icon: const Icon(Icons.settings_outlined)),
@@ -89,14 +96,21 @@ class _MainScreenState extends State<MainScreen> {
                 if (v == 'logs') {
                   Navigator.push(context,
                       MaterialPageRoute(builder: (_) => const LogScreen()));
+                } else if (v == 'prices') {
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const ProductPricesScreen()));
                 } else {
                   showAboutDialog(
                       context: context,
                       applicationName: 'Pastelaria Gaúcha',
-                      applicationVersion: '2.1.0 · em validação');
+                      applicationVersion: '2.4.4 · em validação');
                 }
               },
               itemBuilder: (_) => const [
+                    PopupMenuItem(
+                        value: 'prices', child: Text('Preços dos produtos')),
                     PopupMenuItem(
                         value: 'logs', child: Text('Diagnóstico e logs')),
                     PopupMenuItem(

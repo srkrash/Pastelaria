@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/item_pedido.dart';
+import '../models/pricing_rules.dart';
+import '../models/pastel_extra.dart';
 import '../providers/pedidos_provider.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
@@ -21,10 +23,52 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
   bool _busy = false;
   String? _fingerprint;
   String _commandId = newCommandId();
+  Map<String, dynamic>? _catalog;
+  String? _priceError;
+  bool _loadingPrices = true;
   @override
   void initState() {
     super.initState();
     _notes.text = context.read<PedidosProvider>().draftNotes;
+    _loadPrices();
+  }
+
+  Future<void> _loadPrices() async {
+    try {
+      final data = await (widget.api ?? ApiService()).getPriceCatalog();
+      if (mounted &&
+          (_catalog == null ||
+              (data['catalog_revision'] as int) >=
+                  (_catalog!['catalog_revision'] as int))) {
+        setState(() {
+          _catalog = data;
+          _priceError = null;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(
+            () => _priceError = 'Não foi possível atualizar os preços. $error');
+      }
+    } finally {
+      if (mounted) setState(() => _loadingPrices = false);
+    }
+  }
+
+  int _unit(ItemPedido item, [Map<String, dynamic>? catalog]) {
+    final current = catalog ?? _catalog;
+    if (current == null) return itemUnitCents(item);
+    if (item.produtoNome == 'Pastel') {
+      return PricingRules.fromJson(current['rules'] as Map)
+              .pastel(item.ingredientes) +
+          extraUnitCents(item.adicionais);
+    }
+    for (final product in current['products'] as List) {
+      if (product['nome'] == item.produtoNome) {
+        return product['preco_centavos'] as int;
+      }
+    }
+    return itemUnitCents(item);
   }
 
   @override
@@ -34,8 +78,13 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
   }
 
   Future<void> _addPastel() async {
+    if (_catalog == null) await _loadPrices();
+    if (!mounted || _catalog == null) return;
     final result = await Navigator.push<Map<String, dynamic>>(
-        context, MaterialPageRoute(builder: (_) => const AddPastelScreen()));
+        context,
+        MaterialPageRoute(
+            builder: (_) => AddPastelScreen(
+                pricing: PricingRules.fromJson(_catalog!['rules'] as Map))));
     if (result == null || !mounted) return;
     context.read<PedidosProvider>().adicionarItem(ItemPedido(
         id: 0,
@@ -46,12 +95,16 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
         statusItem: 'aguardando',
         preco: 0,
         ingredientes: List<String>.from(result['ingredientes'] as List),
+        adicionais: PastelExtra.parse(result['adicionais']),
         observacoesItem: result['observacoesItem'] as String));
   }
 
   Future<void> _addProduct(String type) async {
-    final result = await Navigator.push<List<ItemPedido>>(context,
-        MaterialPageRoute(builder: (_) => AddProductScreen(productType: type)));
+    final result = await Navigator.push<List<ItemPedido>>(
+        context,
+        MaterialPageRoute(
+            builder: (_) =>
+                AddProductScreen(productType: type, api: widget.api)));
     if (result == null || !mounted) return;
     for (final item in result) {
       context.read<PedidosProvider>().adicionarItem(item);
@@ -83,16 +136,46 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
   Future<void> _confirm(PedidosProvider p) async {
     if (_busy || p.itensPedidoAtual.isEmpty) return;
     FocusScope.of(context).unfocus();
+    setState(() => _busy = true);
+    try {
+      final previous = p.itensPedidoAtual.map(_unit).toList();
+      final latest = await (widget.api ?? ApiService()).getPriceCatalog();
+      if (!mounted) return;
+      final updated =
+          p.itensPedidoAtual.map((item) => _unit(item, latest)).toList();
+      setState(() {
+        _catalog = latest;
+        _priceError = null;
+      });
+      if (jsonEncode(previous) != jsonEncode(updated)) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'Preços atualizados. Confira o novo total e confirme novamente.')));
+        setState(() => _busy = false);
+        return;
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _priceError = 'Não foi possível conferir os preços. Tente novamente.';
+        });
+      }
+      return;
+    }
     final payload = <String, dynamic>{
       'observacoes_pedido': '[${p.draftType}] ${_notes.text.trim()}',
       'itens': p.itensPedidoAtual
           .map((i) => {
                 'produto_nome': i.produtoNome,
                 'quantidade': i.quantidade,
+                'preco_esperado_centavos': _unit(i),
                 'ingredientes': i.ingredientes
                     .map((s) => {'nome': s, 'quantidade': 1})
                     .toList(),
-                'observacoes_item': i.observacoesItem
+                'observacoes_item': i.observacoesItem,
+                'adicionais':
+                    i.adicionais.map((extra) => extra.toJson()).toList(),
               })
           .toList(),
     };
@@ -117,6 +200,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
               : 'Pedido de balcão confirmado')));
       Navigator.pop(context);
     } catch (e) {
+      if (e is ApiException && e.status == 422) await _loadPrices();
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('$e')));
@@ -235,7 +319,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                                             style: const TextStyle(
                                                 fontSize: 21,
                                                 fontWeight: FontWeight.w800))),
-                                    Text(money(itemUnitCents(i) * i.quantidade),
+                                    Text(money(_unit(i) * i.quantidade),
                                         style: const TextStyle(
                                             fontSize: 21,
                                             fontWeight: FontWeight.w800))
@@ -246,6 +330,13 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                                     child: Text(i.ingredientes.join(' · '),
                                         style: const TextStyle(
                                             fontSize: 17, color: mutedInk))),
+                              for (final extra in i.adicionais)
+                                Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Text(
+                                        'Adicional: ${extra.description}',
+                                        style: const TextStyle(
+                                            fontSize: 17, color: brand))),
                               if (i.observacoesItem.isNotEmpty)
                                 Padding(
                                     padding: const EdgeInsets.only(top: 6),
@@ -289,75 +380,93 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
   Widget build(BuildContext context) {
     final p = context.watch<PedidosProvider>();
     final units = p.itensPedidoAtual.fold<int>(0, (n, i) => n + i.quantidade);
-    final total = p.itensPedidoAtual
-        .fold<int>(0, (n, i) => n + itemUnitCents(i) * i.quantidade);
+    final total =
+        p.itensPedidoAtual.fold<int>(0, (n, i) => n + _unit(i) * i.quantidade);
     return PopScope(
         canPop: !_busy,
         child: Scaffold(
           appBar: AppBar(title: const Text('Montar pedido'), actions: [
+            IconButton(
+                tooltip: 'Atualizar preços',
+                onPressed: _busy ? null : _loadPrices,
+                icon: const Icon(Icons.price_check)),
             TextButton.icon(
                 onPressed: _busy ? null : () => _discard(p),
                 icon: const Icon(Icons.delete_sweep_outlined),
                 label: const Text('Limpar')),
             const SizedBox(width: 12)
           ]),
-          body: AbsorbPointer(
-              absorbing: _busy,
-              child: LayoutBuilder(builder: (context, c) {
-                final wide = c.maxWidth >= 900;
-                return Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                    child: wide
-                        ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                                Expanded(child: _comanda(p, true)),
-                                const SizedBox(width: 20),
-                                SizedBox(
-                                    width: 300,
-                                    child: SingleChildScrollView(
-                                        child: SurfaceCard(
-                                            child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.stretch,
-                                                children: [
-                                          _categories(),
-                                          const Padding(
-                                              padding: EdgeInsets.symmetric(
-                                                  vertical: 16),
-                                              child: Divider()),
-                                          _type(p),
-                                          const SizedBox(height: 24),
-                                          _observations(p)
-                                        ]))))
-                              ])
-                        : Column(children: [
-                            SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(children: [
-                                  FilledButton.icon(
-                                      onPressed: _addPastel,
-                                      icon: const Icon(Icons.restaurant),
-                                      label: const Text('Pastel')),
-                                  const SizedBox(width: 10),
-                                  OutlinedButton.icon(
-                                      onPressed: () => _addProduct('salgado'),
-                                      icon: const Icon(
-                                          Icons.bakery_dining_outlined),
-                                      label: const Text('Salgados')),
-                                  const SizedBox(width: 10),
-                                  OutlinedButton.icon(
-                                      onPressed: () => _addProduct('bebida'),
-                                      icon: const Icon(
-                                          Icons.local_drink_outlined),
-                                      label: const Text('Bebidas'))
-                                ])),
-                            const SizedBox(height: 16),
-                            _type(p),
-                            const SizedBox(height: 18),
-                            Expanded(child: _comanda(p, false)),
-                          ]));
-              })),
+          body: Column(children: [
+            if (_loadingPrices) const LinearProgressIndicator(),
+            if (_priceError != null)
+              Padding(
+                  padding: const EdgeInsets.all(12),
+                  child:
+                      Text(_priceError!, style: const TextStyle(color: brand))),
+            Expanded(
+                child: AbsorbPointer(
+                    absorbing: _busy,
+                    child: LayoutBuilder(builder: (context, c) {
+                      final wide = c.maxWidth >= 900;
+                      return Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                          child: wide
+                              ? Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                      Expanded(child: _comanda(p, true)),
+                                      const SizedBox(width: 20),
+                                      SizedBox(
+                                          width: 300,
+                                          child: SingleChildScrollView(
+                                              child: SurfaceCard(
+                                                  child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .stretch,
+                                                      children: [
+                                                _categories(),
+                                                const Padding(
+                                                    padding:
+                                                        EdgeInsets.symmetric(
+                                                            vertical: 16),
+                                                    child: Divider()),
+                                                _type(p),
+                                                const SizedBox(height: 24),
+                                                _observations(p)
+                                              ]))))
+                                    ])
+                              : Column(children: [
+                                  SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: Row(children: [
+                                        FilledButton.icon(
+                                            onPressed: _addPastel,
+                                            icon: const Icon(Icons.restaurant),
+                                            label: const Text('Pastel')),
+                                        const SizedBox(width: 10),
+                                        OutlinedButton.icon(
+                                            onPressed: () =>
+                                                _addProduct('salgado'),
+                                            icon: const Icon(
+                                                Icons.bakery_dining_outlined),
+                                            label: const Text('Salgados')),
+                                        const SizedBox(width: 10),
+                                        OutlinedButton.icon(
+                                            onPressed: () =>
+                                                _addProduct('bebida'),
+                                            icon: const Icon(
+                                                Icons.local_drink_outlined),
+                                            label: const Text('Bebidas'))
+                                      ])),
+                                  const SizedBox(height: 16),
+                                  _type(p),
+                                  const SizedBox(height: 18),
+                                  Expanded(child: _comanda(p, false)),
+                                ]));
+                    }))),
+          ]),
           bottomNavigationBar: SafeArea(
               top: false,
               child: Container(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../ui/app_ui.dart';
 import 'fila_entrega_screen.dart';
+import '../models/pastel_extra.dart';
 
 class EditarPedidoSelecionadoScreen extends StatefulWidget {
   final int pedidoId;
@@ -193,6 +194,14 @@ class _EditarPedidoSelecionadoScreenState
                                             style: const TextStyle(
                                                 color: mutedInk,
                                                 fontSize: 18))),
+                                  for (final extra
+                                      in PastelExtra.parse(i['adicionais']))
+                                    Padding(
+                                        padding: const EdgeInsets.only(top: 8),
+                                        child: Text(
+                                            'Adicional: ${extra.description}',
+                                            style: const TextStyle(
+                                                color: brand, fontSize: 18))),
                                   if (i['observacoes_item'] != '')
                                     Padding(
                                         padding: const EdgeInsets.only(top: 8),

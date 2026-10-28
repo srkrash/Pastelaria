@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/pedidos_provider.dart';
 import '../services/api_service.dart';
 import '../ui/app_ui.dart';
+import '../models/pastel_extra.dart';
 
 class OrderQueueScreen extends StatefulWidget {
   final bool production;
@@ -35,68 +36,99 @@ class _OrderQueueScreenState extends State<OrderQueueScreen> {
   bool _partial(Map<String, dynamic> p) => _items(p).any((i) =>
       i['quantidade_entregue'] > 0 ||
       i['quantidade_pronta'] > 0 && _pending(i) > 0);
+  bool _orderBusy(Map<String, dynamic> order) =>
+      _busy.any((key) => key.startsWith('${order['pedido_id']}:'));
+  bool _canDeliverAll(Map<String, dynamic> order) =>
+      order['status'] == 'aberto' &&
+      _items(order).every((item) => _pending(item) == 0) &&
+      _items(order).any((item) => _available(item) > 0);
+
+  Future<void> _deliverAll(Map<String, dynamic> order) async {
+    if (_orderBusy(order)) return;
+    final key = '${order['pedido_id']}:all';
+    final provider = context.read<PedidosProvider>();
+    setState(() => _busy.add(key));
+    try {
+      await (widget.api ?? ApiService()).deliverOrder(order);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$error')));
+      }
+    } finally {
+      await provider.refresh();
+      if (mounted) setState(() => _busy.remove(key));
+    }
+  }
+
   Future<void> _change(Map<String, dynamic> order, Map<String, dynamic> item,
       int available) async {
     var quantity = 1;
-    final count = await showDialog<int>(
-        context: context,
-        builder: (dialogContext) => StatefulBuilder(
-            builder: (context, update) => AlertDialog(
-                  title: Text(widget.production
-                      ? 'Concluir preparo'
-                      : 'Registrar entrega'),
-                  content: SizedBox(
-                      width: 360,
-                      child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                                order['numero_pedido'] > 0
-                                    ? 'Senha ${order['numero_pedido'].toString().padLeft(2, '0')}'
-                                    : 'Pedido de balcão',
-                                style: const TextStyle(
-                                    fontSize: 26, fontWeight: FontWeight.w800)),
-                            const SizedBox(height: 8),
-                            Text(item['produto_nome'] as String,
-                                style: const TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.w700)),
-                            if ((item['ingredientes'] as List).isNotEmpty)
-                              Text((item['ingredientes'] as List).join(', '),
-                                  style: const TextStyle(color: mutedInk)),
-                            if (item['observacoes_item'] != '')
-                              Text('OBS: ${item['observacoes_item']}',
-                                  style: const TextStyle(color: brand)),
-                            const SizedBox(height: 20),
-                            Center(
-                                child: QuantityStepper(
-                                    value: quantity,
-                                    max: available,
-                                    onChanged: (v) =>
-                                        update(() => quantity = v))),
-                            const SizedBox(height: 12),
-                            Center(
-                                child: TextButton(
-                                    onPressed: () =>
-                                        update(() => quantity = available),
-                                    child:
-                                        Text('Selecionar todas: $available'))),
-                            Text(
-                                widget.production
-                                    ? 'O restante continuará aguardando preparo.'
-                                    : 'Somente estas unidades serão marcadas como entregues.',
-                                style: const TextStyle(color: mutedInk)),
-                          ])),
-                  actions: [
-                    TextButton(
-                        onPressed: () => Navigator.pop(dialogContext),
-                        child: const Text('Voltar')),
-                    FilledButton(
-                        onPressed: () => Navigator.pop(dialogContext, quantity),
-                        child: const Text('Confirmar'))
-                  ],
-                )));
-    if (count == null || !mounted) return;
+    final count = widget.production
+        ? available
+        : await showDialog<int>(
+            context: context,
+            builder: (dialogContext) => StatefulBuilder(
+                builder: (context, update) => AlertDialog(
+                      title: Text(widget.production
+                          ? 'Concluir preparo'
+                          : 'Registrar entrega'),
+                      content: SizedBox(
+                          width: 360,
+                          child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                    order['numero_pedido'] > 0
+                                        ? 'Senha ${order['numero_pedido'].toString().padLeft(2, '0')}'
+                                        : 'Pedido de balcão',
+                                    style: const TextStyle(
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w800)),
+                                const SizedBox(height: 8),
+                                Text(item['produto_nome'] as String,
+                                    style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w700)),
+                                if ((item['ingredientes'] as List).isNotEmpty)
+                                  Text(
+                                      (item['ingredientes'] as List).join(', '),
+                                      style: const TextStyle(color: mutedInk)),
+                                if (item['observacoes_item'] != '')
+                                  Text('OBS: ${item['observacoes_item']}',
+                                      style: const TextStyle(color: brand)),
+                                const SizedBox(height: 20),
+                                Center(
+                                    child: QuantityStepper(
+                                        value: quantity,
+                                        max: available,
+                                        onChanged: (v) =>
+                                            update(() => quantity = v))),
+                                const SizedBox(height: 12),
+                                Center(
+                                    child: TextButton(
+                                        onPressed: () =>
+                                            update(() => quantity = available),
+                                        child: Text(
+                                            'Selecionar todas: $available'))),
+                                Text(
+                                    widget.production
+                                        ? 'O restante continuará aguardando preparo.'
+                                        : 'Somente estas unidades serão marcadas como entregues.',
+                                    style: const TextStyle(color: mutedInk)),
+                              ])),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(dialogContext),
+                            child: const Text('Voltar')),
+                        FilledButton(
+                            onPressed: () =>
+                                Navigator.pop(dialogContext, quantity),
+                            child: const Text('Confirmar'))
+                      ],
+                    )));
+    if (count == null || !mounted || _orderBusy(order)) return;
     final key = '${order['pedido_id']}:${item['item_id']}';
     setState(() => _busy.add(key));
     final provider = context.read<PedidosProvider>();
@@ -128,6 +160,12 @@ class _OrderQueueScreenState extends State<OrderQueueScreen> {
             padding: const EdgeInsets.only(top: 5),
             child: Text((i['ingredientes'] as List).join(' · '),
                 style: const TextStyle(fontSize: 18, color: mutedInk))),
+      for (final extra in PastelExtra.parse(i['adicionais']))
+        Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text('Adicional: ${extra.description}',
+                style: const TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.w700, color: brand))),
       if (i['observacoes_item'] != '')
         Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -144,8 +182,7 @@ class _OrderQueueScreenState extends State<OrderQueueScreen> {
     ]);
     final action = available > 0
         ? FilledButton.icon(
-            onPressed: provider.error == null &&
-                    !_busy.contains('${p['pedido_id']}:${i['item_id']}')
+            onPressed: provider.error == null && !_orderBusy(p)
                 ? () => _change(p, i, available)
                 : null,
             style: FilledButton.styleFrom(
@@ -324,20 +361,56 @@ class _OrderQueueScreenState extends State<OrderQueueScreen> {
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                        child: Text(
+                                            p['numero_pedido'] > 0
+                                                ? 'Senha ${p['numero_pedido'].toString().padLeft(2, '0')}'
+                                                : 'Balcão',
+                                            style: const TextStyle(
+                                                fontSize: 34,
+                                                fontWeight: FontWeight.w900,
+                                                color: ink))),
+                                    if (!widget.production) ...[
+                                      const SizedBox(width: 12),
+                                      Tooltip(
+                                        message: _canDeliverAll(p)
+                                            ? 'Entregar todos os itens restantes deste pedido'
+                                            : 'Aguardando todos os pastéis ficarem prontos',
+                                        child: FilledButton.icon(
+                                          key: ValueKey(
+                                              'deliver-all-${p['pedido_id']}'),
+                                          onPressed: provider.error == null &&
+                                                  !_orderBusy(p) &&
+                                                  _canDeliverAll(p)
+                                              ? () => _deliverAll(p)
+                                              : null,
+                                          style: FilledButton.styleFrom(
+                                              backgroundColor: success),
+                                          icon: _busy.contains(
+                                                  '${p['pedido_id']}:all')
+                                              ? const SizedBox(
+                                                  width: 18,
+                                                  height: 18,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                          strokeWidth: 2))
+                                              : const Icon(Icons.done_all),
+                                          label: const Text('Entregar tudo'),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
                                 Wrap(
                                     spacing: 16,
                                     runSpacing: 8,
                                     crossAxisAlignment:
                                         WrapCrossAlignment.center,
                                     children: [
-                                      Text(
-                                          p['numero_pedido'] > 0
-                                              ? 'Senha ${p['numero_pedido'].toString().padLeft(2, '0')}'
-                                              : 'Balcão',
-                                          style: const TextStyle(
-                                              fontSize: 34,
-                                              fontWeight: FontWeight.w900,
-                                              color: ink)),
                                       StatusPill(trip ? 'Viagem' : 'No local',
                                           color: trip
                                               ? const Color(0xFF285C8C)

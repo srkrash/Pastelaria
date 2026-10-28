@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:timezone/timezone.dart' as tz;
+import '../models/pricing_rules.dart';
+import '../models/pastel_extra.dart';
 
 class BusinessError implements Exception {
   final String message;
@@ -66,6 +68,99 @@ class OrderStore {
 
   Future<Map<String, dynamic>> order(int id) => _order(db, id);
 
+  Future<PricingRules> _pricing(DatabaseExecutor tx) async {
+    final rows = await tx
+        .query('meta', where: 'key = ?', whereArgs: ['pricing_rules_v1']);
+    return rows.isEmpty
+        ? const PricingRules()
+        : PricingRules.fromJson(
+            jsonDecode(rows.single['value'] as String) as Map);
+  }
+
+  Future<int> _catalogRevision(DatabaseExecutor tx) async {
+    final rows = await tx
+        .query('meta', where: 'key = ?', whereArgs: ['catalog_revision']);
+    return rows.isEmpty ? 0 : int.parse(rows.single['value'] as String);
+  }
+
+  Future<Map<String, dynamic>> _catalog(DatabaseExecutor tx) async => {
+        'catalog_revision': await _catalogRevision(tx),
+        'rules': (await _pricing(tx)).toJson(),
+        'products': (await tx.query('products', orderBy: 'id'))
+            .map((r) => jsonDecode(r['data'] as String))
+            .toList(),
+      };
+  Future<Map<String, dynamic>> priceCatalog() => db.transaction(_catalog);
+
+  Future<Map<String, dynamic>> _updatePrices(
+      Transaction tx, Map<String, dynamic> payload, int revision) async {
+    if (payload['expected_catalog_revision'] != await _catalogRevision(tx)) {
+      throw BusinessError(
+          'Os preços foram alterados em outro tablet. Recarregue antes de editar.',
+          409);
+    }
+    final ruleData = payload['rules'];
+    const keys = [
+      'base_centavos',
+      'adicional_centavos',
+      'pizza_centavos',
+      'misto_centavos'
+    ];
+    bool valid(dynamic value) => value is int && value >= 0 && value <= 999999;
+    if (ruleData is! Map ||
+        ruleData.length != keys.length ||
+        keys.any((key) => !valid(ruleData[key]))) {
+      throw BusinessError(
+          'Informe preços em centavos, entre zero e R\$ 9.999,99.');
+    }
+    final changes = payload['products'];
+    if (changes is! List || changes.length > 500) {
+      throw BusinessError('Lista de preços inválida.');
+    }
+    final seen = <int>{};
+    final audit = <Map<String, dynamic>>[];
+    final oldRules = (await _pricing(tx)).toJson();
+    for (final raw in changes) {
+      if (raw is! Map ||
+          raw['id'] is! int ||
+          !seen.add(raw['id'] as int) ||
+          !valid(raw['preco_centavos'])) {
+        throw BusinessError('Produto ou preço inválido ou repetido.');
+      }
+      final rows =
+          await tx.query('products', where: 'id = ?', whereArgs: [raw['id']]);
+      if (rows.isEmpty) throw BusinessError('Produto não encontrado.', 404);
+      final product =
+          jsonDecode(rows.single['data'] as String) as Map<String, dynamic>;
+      if (!['bebida', 'salgado'].contains(product['tipo'])) {
+        throw BusinessError(
+            'Use os campos de regras para alterar os preços dos pastéis.');
+      }
+      audit.add({
+        'id': raw['id'],
+        'antes_centavos': product['preco_centavos'],
+        'depois_centavos': raw['preco_centavos']
+      });
+      product['preco_centavos'] = raw['preco_centavos'];
+      product['preco'] = (raw['preco_centavos'] as int) / 100;
+      await tx.update('products', {'data': jsonEncode(product)},
+          where: 'id = ?', whereArgs: [raw['id']]);
+    }
+    for (final entry in {
+      'pricing_rules_v1': jsonEncode(ruleData),
+      'catalog_revision': '$revision'
+    }.entries) {
+      await tx.insert('meta', {'key': entry.key, 'value': entry.value},
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    return {
+      ...await _catalog(tx),
+      'changed_at': now().toUtc().toIso8601String(),
+      'previous_rules': oldRules,
+      'price_changes': audit
+    };
+  }
+
   Future<Map<String, dynamic>> snapshot(
           {bool today = false, bool activeOnly = false}) =>
       db.transaction((tx) async {
@@ -100,22 +195,79 @@ class OrderStore {
         if (previous.single['fingerprint'] != fingerprint) {
           throw BusinessError('Comando reutilizado com dados diferentes.', 409);
         }
-        return jsonDecode(previous.single['result'] as String)
+        final result = jsonDecode(previous.single['result'] as String)
             as Map<String, dynamic>;
+        if (result.containsKey('removed_test_order_id')) {
+          throw BusinessError(
+              'Pedido de teste removido durante a limpeza.', 410);
+        }
+        return result;
       }
       final revision = int.parse((await tx
                   .query('meta', where: 'key = ?', whereArgs: ['revision']))
               .single['value'] as String) +
           1;
-      final result = action == 'create'
-          ? await _create(tx, payload, revision)
-          : await _change(tx, action, payload, revision);
+      final result = action == 'clear_today_tests'
+          ? await _clearTodayTests(tx, payload, revision)
+          : action == 'update_prices'
+              ? await _updatePrices(tx, payload, revision)
+              : action == 'create'
+                  ? await _create(tx, payload, revision)
+                  : await _change(tx, action, payload, revision);
       await tx.update('meta', {'value': '$revision'},
           where: 'key = ?', whereArgs: ['revision']);
       await tx.insert('commands',
           {'id': id, 'fingerprint': fingerprint, 'result': jsonEncode(result)});
       return result;
     });
+  }
+
+  Future<Map<String, dynamic>> _clearTodayTests(
+      Transaction tx, Map<String, dynamic> payload, int revision) async {
+    if (payload['confirmation'] != 'APAGAR TESTES DE HOJE' ||
+        payload['expected_day'] != day ||
+        payload['expected_revision'] != revision - 1) {
+      throw BusinessError(
+          'Data ou pedidos alterados. Confira novamente antes de apagar.', 409);
+    }
+    final rows = await tx.query('orders',
+        columns: ['id'], where: 'day = ?', whereArgs: [day]);
+    if (rows.isEmpty || payload['expected_count'] != rows.length) {
+      throw BusinessError(
+          'Quantidade de pedidos alterada. Confira novamente.', 409);
+    }
+    final sending = await tx.query('print_jobs',
+        columns: ['id'],
+        where: 'status = ?',
+        whereArgs: ['enviando'],
+        limit: 1);
+    if (sending.isNotEmpty) {
+      throw BusinessError('Aguarde o envio de impressão terminar.', 409);
+    }
+    final ids = rows.map((row) => row['id'] as int).toSet();
+    // Retain command IDs/fingerprints as tombstones so an offline client cannot
+    // recreate a removed test order by retrying the original create command.
+    for (final command in await tx.query('commands')) {
+      final result = jsonDecode(command['result'] as String) as Map;
+      if (ids.contains(result['id'])) {
+        await tx.update(
+            'commands',
+            {
+              'result': jsonEncode({
+                'removed_test_order_id': result['id'],
+              })
+            },
+            where: 'id = ?',
+            whereArgs: [command['id']]);
+      }
+    }
+    await tx.delete('print_jobs',
+        where: 'order_id IN (SELECT id FROM orders WHERE day = ?)',
+        whereArgs: [day]);
+    await tx.delete('orders', where: 'day = ?', whereArgs: [day]);
+    // Keep catalog, IDs and daily sequence; deleting test orders is not a
+    // request to reuse IDs or reset the ticket counter.
+    return {'deleted_count': rows.length, 'day': day, 'revision': revision};
   }
 
   int _quantity(dynamic value) {
@@ -133,6 +285,8 @@ class OrderStore {
       throw BusinessError('Adicione de 1 a 200 itens.');
     }
     final items = <Map<String, dynamic>>[];
+    final pricing = await _pricing(tx);
+    final catalogChanged = await _catalogRevision(tx) > 0;
     var total = 0;
     for (var i = 0; i < raw.length; i++) {
       final input = Map<String, dynamic>.from(raw[i] as Map);
@@ -148,6 +302,16 @@ class OrderStore {
         throw BusinessError('Selecione ingredientes dentro de um pastel.');
       }
       final ingredients = <String>[];
+      List<PastelExtra> extras;
+      try {
+        extras = PastelExtra.parse(input['adicionais']);
+      } on FormatException catch (error) {
+        throw BusinessError(error.message);
+      }
+      if (extras.isNotEmpty && product['tipo'] != 'pastel') {
+        throw BusinessError(
+            'Recheio adicional disponível somente para pastel.');
+      }
       var cents = product['preco_centavos'] as int;
       if (product['tipo'] == 'pastel') {
         for (final ing in (input['ingredientes'] as List? ?? [])) {
@@ -171,13 +335,20 @@ class OrderStore {
           if (ingredients.length != 1) {
             throw BusinessError('Pastel especial não pode misturar recheios.');
           }
-          cents = ingredients.single == 'Pizza' ? 1500 : 2500;
+          cents = pricing.pastel(ingredients);
         } else {
-          final paid = ingredients
-              .where((v) => !['Cebola', 'Cebolinha', 'Orégano'].contains(v))
-              .length;
-          cents = 1200 + (paid > 2 ? (paid - 2) * 300 : 0);
+          cents = pricing.pastel(ingredients);
         }
+      }
+      final baseCents = cents;
+      cents += extraUnitCents(extras);
+      if ((input.containsKey('preco_esperado_centavos') &&
+              input['preco_esperado_centavos'] != cents) ||
+          ((catalogChanged || extras.isNotEmpty) &&
+              !input.containsKey('preco_esperado_centavos'))) {
+        throw BusinessError(
+            'Os preços mudaram. Atualize os preços da comanda e confira o total antes de confirmar. Tablets antigos precisam do APK atualizado.',
+            422);
       }
       total += cents * quantity;
       items.add({
@@ -190,6 +361,8 @@ class OrderStore {
         'quantidade_entregue': 0,
         'quantidade_cancelada': 0,
         'preco_unitario_centavos': cents,
+        'preco_base_unitario_centavos': baseCents,
+        'adicionais': extras.map((extra) => extra.toJson()).toList(),
         'preco_unitario': cents / 100,
         'subtotal': cents * quantity / 100,
         'preco': cents * quantity / 100,
@@ -275,6 +448,18 @@ class OrderStore {
             },
             where: 'order_id = ? AND status = ?',
             whereArgs: [order['id'], 'pendente']);
+      } else if (action == 'deliver_all') {
+        if (items.any((i) =>
+            i['quantidade_pronta'] <
+            i['quantidade'] - i['quantidade_cancelada'])) {
+          throw BusinessError(
+              'Aguarde todos os pastéis ficarem prontos antes de entregar o pedido inteiro.',
+              409);
+        }
+        for (final item in items) {
+          item['quantidade_entregue'] =
+              item['quantidade'] - item['quantidade_cancelada'];
+        }
       } else if (action == 'ready' || action == 'deliver') {
         final matching = items.where((i) => i['item_id'] == p['item_id']);
         if (matching.isEmpty) throw BusinessError('Item não encontrado.', 404);

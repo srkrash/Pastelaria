@@ -1,17 +1,19 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:convert';
 import 'order_store.dart';
+import 'receipt_encoder.dart';
+import 'pix_payment.dart';
 
 /// Failed/ambiguous jobs require operator review, never an automatic resend.
 class PrinterWorker {
   final OrderStore store;
   final String host;
   final int port;
+  final PixConfiguration? pix;
   Timer? _timer;
   bool _busy = false;
   Future<void>? _active;
-  PrinterWorker(this.store, this.host, this.port);
+  PrinterWorker(this.store, this.host, this.port, {this.pix});
   Future<void> start() async {
     await store.db.update(
         'print_jobs',
@@ -53,32 +55,10 @@ class PrinterWorker {
       socket =
           await Socket.connect(host, port, timeout: const Duration(seconds: 5));
       socket.listen((_) {}, onError: (_) {});
-      final lines = <String>[
-        'PASTELARIA GAUCHA',
-        if (job['second_copy'] == 1) '*** SEGUNDA VIA ***',
-        order['numero_pedido'] > 0
-            ? 'SENHA: ${order['numero_pedido']}'
-            : 'BALCAO / SEM PASTEL',
-        'PEDIDO INTERNO: ${order['id']}',
-        order['data_hora_pedido'] as String,
-        '${order['observacoes']}',
-        '------------------------------------------',
-      ];
-      for (final item in order['itens'] as List) {
-        lines.add('${item['quantidade']}x ${item['produto_nome']}');
-        if ((item['ingredientes'] as List).isNotEmpty) {
-          lines.add('  ${(item['ingredientes'] as List).join(', ')}');
-        }
-        if (item['observacoes_item'] != '') {
-          lines.add('  OBS: ${item['observacoes_item']}');
-        }
-      }
-      lines.add(
-          'TOTAL: R\$ ${(order['total_centavos'] / 100).toStringAsFixed(2)}');
-      // Conservative ASCII until the printer code page is physically validated.
-      final text = _ascii('${lines.join('\n')}\n\n\n');
+      final bytes =
+          encodeReceipt(order, secondCopy: job['second_copy'] == 1, pix: pix);
       sending = true;
-      socket.add([27, 64, ...ascii.encode(text), 29, 86, 0]);
+      socket.add(bytes);
       await socket.flush().timeout(const Duration(seconds: 5));
       await socket.close().timeout(const Duration(seconds: 5));
       await store.db.update('print_jobs', {'status': 'enviado', 'error': null},
@@ -100,18 +80,5 @@ class PrinterWorker {
       socket?.destroy();
       _busy = false;
     }
-  }
-
-  String _ascii(String text) {
-    const from = 'áàâãäÁÀÂÃÄéèêëÉÈÊËíìîïÍÌÎÏóòôõöÓÒÔÕÖúùûüÚÙÛÜçÇ';
-    const to = 'aaaaaAAAAAeeeeEEEEiiiiIIIIoooooOOOOOuuuuUUUUcC';
-    return text.split('').map((c) {
-      final i = from.indexOf(c);
-      return i >= 0
-          ? to[i]
-          : c.codeUnitAt(0) < 128
-              ? c
-              : '?';
-    }).join();
   }
 }

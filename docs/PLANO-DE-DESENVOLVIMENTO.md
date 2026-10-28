@@ -1,5 +1,11 @@
 # Plano de desenvolvimento e validação
 
+**Atualização em 28/10/2026 — E7 parcialmente preparada:** conversor explícito do
+PostgreSQL, backup consistente do legado e pacote SQLite para restauração no
+tablet, com encerramento do histórico autorizado pelo responsável. Ensaio de
+restauração integral com 9.862 pedidos aprovado no PC. A instalação, homologação
+nos tablets e troca definitiva continuam pendentes. Ver [roteiro](MIGRACAO-POSTGRESQL.md).
+
 Estado inicial: documentação criada; itens abaixo ainda não implementados ou validados.
 
 **Atualização de implementação em 23/10/2026:** núcleo Dart/SQLite, telas por cartões e parcialidade, sincronização, impressão TCP e backup local criptografado foram implementados; 15 testes aprovados, análise estática sem apontamentos e APK de validação compilado. Isso não conclui as etapas que dependem de hardware real, conta de nuvem ou migração dos dados em uso. Consulte [implementação e limitações](IMPLEMENTACAO-V2.md) para o estado atual; o inventário abaixo preserva as evidências iniciais do legado.
@@ -24,6 +30,7 @@ Inspeção estática em 23/10/2026. Não houve execução nem reprodução nos t
 | RISCO-06 | Contrato | Snapshot da entrega retorna `pedido_id`; eventos usam os dados montados na criação | Comparar payloads e normalizar IDs/campos; testar criação ao vivo versus recarga |
 | RISCO-07 | Ciclo de conexão | `updateConnection` desconecta mas não descarta explicitamente o socket antigo antes de criar outro | Testar listeners duplicados, troca de IP e reconexões repetidas |
 | MIG-01 | Dependência incompatível com destino | `printer.py` importa Win32; `app.py` instancia impressora Windows | Criar adaptador compatível com hardware real no Android |
+| BUG-05 | Relato de cupom interrompido; causa física ainda não reproduzida | Usuário informou corte no meio da descrição do primeiro pastel. `PrinterWorker` usava `GS V 0`, fora dos modos documentados no manual da TP-650 | Alterado para avanço/corte parcial `GS V 66 0`, texto sem controles ESC/POS e regressões de conteúdo/TCP aprovadas; repetir no equipamento real. Ver [evidências](CORRECAO-IMPRESSAO-TP650.md) |
 
 Arquivos de referência: `app.py`, `schema.sql`, `printer.py`, `pastelaria_app/lib/providers/pedidos_provider.dart`, `pastelaria_app/lib/screens/fila_entrega_screen.dart` e `pastelaria_app/lib/screens/pastel_queue_screen.dart`.
 
