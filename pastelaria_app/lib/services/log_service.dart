@@ -8,6 +8,7 @@ class LogService extends ChangeNotifier {
   void add(String message) {
     final timestamp = DateTime.now().toIso8601String();
     _logs.add('[$timestamp] $message');
+    if (_logs.length > 500) _logs.removeRange(0, _logs.length - 500);
     notifyListeners();
   }
 

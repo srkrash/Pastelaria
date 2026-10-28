@@ -1,5 +1,7 @@
 # Sistema de Pastelaria - Pastelaria Gaúcha
 
+> **Versão 2 em validação:** o servidor Dart/SQLite está integrado ao aplicativo Android. Consulte [instalação, uso e limitações](docs/IMPLEMENTACAO-V2.md), a [documentação de desenvolvimento](docs/README.md) e as [orientações para agentes](AGENTS.md). A descrição abaixo corresponde ao sistema legado Flask/Windows.
+
 Este projeto foi desenvolvido sob medida para a **Pastelaria Gaúcha**, focando na otimização do atendimento e na flexibilidade para a escolha de recheios personalizados oferecidos pelo estabelecimento. O sistema integra um backend em Flask e um frontend em Flutter para criar uma solução completa de KDS (Kitchen Display System) e PDV.
 
 ## 🚀 Funcionalidades e Regras de Negócio

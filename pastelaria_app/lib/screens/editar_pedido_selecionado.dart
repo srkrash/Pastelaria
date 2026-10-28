@@ -1,342 +1,261 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../services/api_service.dart';
-// Note: Assumindo que o ItemPedido virá como um Map dentro da lista 'itens'
+import '../ui/app_ui.dart';
+import 'fila_entrega_screen.dart';
+import '../models/pastel_extra.dart';
 
 class EditarPedidoSelecionadoScreen extends StatefulWidget {
   final int pedidoId;
-
-  const EditarPedidoSelecionadoScreen({super.key, required this.pedidoId});
-
+  final ApiService? api;
+  const EditarPedidoSelecionadoScreen(
+      {super.key, required this.pedidoId, this.api});
   @override
-  State<EditarPedidoSelecionadoScreen> createState() => _EditarPedidoSelecionadoScreenState();
+  State<EditarPedidoSelecionadoScreen> createState() =>
+      _EditarPedidoSelecionadoScreenState();
 }
 
-class _EditarPedidoSelecionadoScreenState extends State<EditarPedidoSelecionadoScreen> {
-  final ApiService _apiService = ApiService();
-  // Alteramos o tipo para Future<Map<String, dynamic>> pois o API service retorna um dynamic 
-  // que esperamos que seja um Map<String, dynamic> após o decode do JSON.
-  late Future<Map<String, dynamic>> _pedidoFuture;
-
+class _EditarPedidoSelecionadoScreenState
+    extends State<EditarPedidoSelecionadoScreen> {
+  late Future<Map<String, dynamic>> _order;
+  bool _busy = false;
+  ApiService get _api => widget.api ?? ApiService();
   @override
   void initState() {
     super.initState();
-    _fetchPedidoDetails();
+    _load();
   }
 
-  void _fetchPedidoDetails() {
-    setState(() {
-      // **Integração com a função da API real:**
-      _pedidoFuture = _apiService.getPedidoPorId(widget.pedidoId).then((data) {
-        // Garantindo que a resposta seja tratada como Map<String, dynamic>
-        // ignore: unnecessary_type_check
-        if (data is Map<String, dynamic>) {
-          return data;
-        } else {
-          // Se a API retornar null ou um tipo inesperado, tratamos como um erro
-          throw Exception('Formato de dados do pedido inválido.');
-        }
-      });
-    });
+  void _load() {
+    _order = _api.getPedidoPorId(widget.pedidoId);
   }
 
-  // Helper para obter a cor do status (mantendo consistência com EditarPedidosScreen)
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'aberto':
-      case 'aguardando': // Adicionado status de item
-        return Colors.amber.shade700;
-      case 'fechado':
-      case 'entregue': // Adicionado status de item (exemplo)
-        return Colors.green.shade700;
-      case 'cancelado':
-        return Colors.red.shade700;
-      default:
-        return Colors.blueGrey;
-    }
-  }
-
-  // Helper para obter o texto formatado do status (mantendo consistência com EditarPedidosScreen)
-  String _getStatusText(String status) {
-    switch (status) {
-      case 'aberto':
-        return 'Em Aberto';
-      case 'fechado':
-        return 'Finalizado';
-      case 'cancelado':
-        return 'Cancelado';
-      case 'aguardando':
-        return 'Aguardando Produção';
-      default:
-        return status[0].toUpperCase() + status.substring(1); // Capitaliza o primeiro caractere para outros status
-    }
-  }
-  
-  // Lógica para atualizar o status do pedido
-  void _updateStatus(int pedidoId, String newStatus) async {
-    // **TO DO: Implementar a chamada à API para atualizar o status aqui**
-    // Exemplo: final success = await _apiService.updatePedidoStatus(pedidoId, newStatus);
-  final bool success = await _apiService.updatePedidoStatus(pedidoId, newStatus);
-    // Atualiza a UI após a simulação (ou sucesso da API)
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Pedido ID$pedidoId atualizado para ${newStatus.toUpperCase()}!')),
-      );
-      Navigator.of(context).pop(true); 
-    }
-    else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Falha ao atualizar o pedido.')),
-      );
-    }
-    
-    // Volta para a tela anterior, ativando a recarga em EditarPedidosScreen
-  }
-
-  void _reimprimirPedido(int pedidoId) async {
+  Future<void> _action(bool cancel) async {
+    final confirm = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+                title: Text(cancel
+                    ? 'Cancelar este pedido?'
+                    : 'Solicitar segunda via?'),
+                content: Text(cancel
+                    ? 'O pedido sairá das filas de produção e entrega. Itens já produzidos ou entregues precisam de conferência e não podem ser cancelados por aqui.'
+                    : 'Confira a impressora antes de continuar. A segunda via pode duplicar um cupom que já saiu.'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(c, false),
+                      child: const Text('Voltar')),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(c, true),
+                      child: Text(
+                          cancel ? 'Cancelar pedido' : 'Imprimir segunda via'))
+                ]));
+    if (confirm != true || !mounted) return;
+    setState(() => _busy = true);
     try {
-      await _apiService.reimprimirPedido(pedidoId);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Solicitação de reimpressão enviada!')),
-        );
+      if (cancel) {
+        await _api.updatePedidoStatus(widget.pedidoId, 'cancelado');
+      } else {
+        await _api.reimprimirPedido(widget.pedidoId);
+      }
+      if (!mounted) return;
+      if (cancel) {
+        Navigator.pop(context, true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Segunda via adicionada à fila de impressão.')));
+        setState(_load);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao reimprimir: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
       }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final formatter = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
-
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _pedidoFuture,
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
+      future: _order,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('Carregando...'),
-              backgroundColor: Colors.deepOrange,
-              foregroundColor: Colors.white,
-            ),
-            body: const Center(child: CircularProgressIndicator()),
-          );
-        }
-        if (snapshot.hasError) {
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('Erro'),
-              backgroundColor: Colors.deepOrange,
-              foregroundColor: Colors.white,
-            ),
-            body: Center(child: Text('Erro ao carregar detalhes do pedido: ${snapshot.error}')),
-          );
-        }
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('Não Encontrado'),
-              backgroundColor: Colors.deepOrange,
-              foregroundColor: Colors.white,
-            ),
-            body: const Center(child: Text('Detalhes do pedido não encontrados.')),
-          );
-        }
-
-        final pedido = snapshot.data!;
-        final String status = pedido['status']?.toString() ?? 'desconhecido';
-        final double totalPedido = double.tryParse(pedido['total_pedido']?.toString() ?? '0.0') ?? 0.0;
-        final List<dynamic> itens = pedido['itens'] ?? [];
-        final String observacao = pedido['observacoes']?.toString() ?? '';
-        final int numeroPedido = pedido['numero_pedido'] as int? ?? 0;
-
+        final o = snapshot.data;
+        final status = o?['status'] as String? ?? '';
         return Scaffold(
           appBar: AppBar(
-            title: Text('Pedido #$numeroPedido'),
-            backgroundColor: Colors.deepOrange,
-            foregroundColor: Colors.white,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.print),
-                onPressed: () => _reimprimirPedido(widget.pedidoId),
-                tooltip: 'Reimprimir Pedido',
-              ),
-            ],
-          ),
-          body: Column(
-            children: [
-              // HEADER: Status e Total
-              Container(
-                padding: const EdgeInsets.all(24.0),
-                color: Colors.amber.shade50,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Status Atual:', style: TextStyle(fontSize: 18, color: Colors.blueGrey)),
-                        Text(
-                          _getStatusText(status),
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: _getStatusColor(status),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const Text('Total do Pedido:', style: TextStyle(fontSize: 18, color: Colors.blueGrey)),
-                        Text(
-                          formatter.format(totalPedido),
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.deepOrange,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // Observações do Pedido (se houver)
-              if (observacao.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.info_outline, color: Colors.blueGrey, size: 28),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Obs. Pedido: $observacao',
-                          style: TextStyle(fontStyle: FontStyle.italic, color: Colors.blueGrey.shade700, fontSize: 20),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              const Divider(height: 1),
-
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text('Itens do Pedido:', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              ),
-
-              // Lista de Itens
-              Expanded(
-                child: ListView.builder(
-                  itemCount: itens.length,
-                  itemBuilder: (context, index) {
-                    final item = itens[index];
-                    final String produtoNome = item['produto_nome']?.toString() ?? 'Produto Desconhecido';
-                    final int quantidade = item['quantidade'] as int? ?? 0;
-
-                    final double precoUnitario = double.tryParse(item['preco_unitario']?.toString() ?? '0.0') ?? 0.0;
-                    final double subtotal = double.tryParse(item['subtotal']?.toString() ?? '0.0') ?? 0.0;
-                    final List<String> ingredientes = (item['ingredientes'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
-                    final String observacaoItem = item['observacoes_item']?.toString() ?? '';
-                    final String statusItem = item['status_item']?.toString() ?? 'aguardando';
-
-                    String subtitleText = 'Preço Unit.: ${formatter.format(precoUnitario)}';
-                    if (ingredientes.isNotEmpty) {
-                      subtitleText += '\nIngredientes: ${ingredientes.join(', ')}';
-                    }
-                    if (observacaoItem.isNotEmpty) {
-                      subtitleText += '\nObs. Item: $observacaoItem';
-                    }
-
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      elevation: 2,
+              title: Text(o == null
+                  ? 'Detalhes do pedido'
+                  : o['numero_pedido'] > 0
+                      ? 'Senha ${o['numero_pedido'].toString().padLeft(2, '0')}'
+                      : 'Pedido de balcão'),
+              actions: [
+                IconButton(
+                    tooltip: 'Solicitar segunda via',
+                    onPressed: o == null || _busy ? null : () => _action(false),
+                    icon: const Icon(Icons.print_outlined)),
+                const SizedBox(width: 12)
+              ]),
+          body: snapshot.connectionState != ConnectionState.done
+              ? const Center(child: CircularProgressIndicator())
+              : o == null
+                  ? Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            radius: 25,
-                            backgroundColor: Colors.deepOrange.shade100,
-                            child: Text('${quantidade}x', style: const TextStyle(color: Colors.deepOrange, fontSize: 20, fontWeight: FontWeight.bold)),
-                          ),
-                          title: Text(produtoNome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 4),
-                              Text(subtitleText, style: TextStyle(fontSize: 18, color: Colors.grey.shade700)),
-                              const SizedBox(height: 8),
-                              Text(
-                                _getStatusText(statusItem),
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: _getStatusColor(statusItem),
-                                ),
-                              ),
-                            ],
-                          ),
-                          trailing: Text(
-                            formatter.format(subtotal),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)
-                          ),
-                          isThreeLine: true,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              // FOOTER: Botões de Ação (Apenas se o status for 'aberto')
-              if (status == 'aberto')
-                Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Row(
-                    children: [
-                      // Botão Cancelar
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => _updateStatus(pedido['id'], 'cancelado'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red.shade700,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 25),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Text('Cancelar Pedido', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-                      // Botão Finalizar
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => _updateStatus(pedido['id'], 'fechado'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green.shade700,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 25),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Text('Finalizar Pedido', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
+                          padding: const EdgeInsets.all(24),
+                          child:
+                              Column(mainAxisSize: MainAxisSize.min, children: [
+                            Text(
+                                'Não foi possível carregar o pedido.\n${snapshot.error ?? ''}',
+                                textAlign: TextAlign.center),
+                            const SizedBox(height: 12),
+                            FilledButton(
+                                onPressed: () => setState(_load),
+                                child: const Text('Tentar novamente'))
+                          ])))
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                      children: [
+                          SurfaceCard(
+                              child: Wrap(
+                                  spacing: 24,
+                                  runSpacing: 16,
+                                  alignment: WrapAlignment.spaceBetween,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                          'Pedido interno ${o['pedido_id'] ?? o['id']}',
+                                          style:
+                                              const TextStyle(color: mutedInk)),
+                                      const SizedBox(height: 10),
+                                      StatusPill(
+                                          status == 'aberto'
+                                              ? 'Em atendimento'
+                                              : status == 'fechado'
+                                                  ? 'Entregue'
+                                                  : 'Cancelado',
+                                          color: status == 'fechado'
+                                              ? success
+                                              : status == 'cancelado'
+                                                  ? brand
+                                                  : mutedInk)
+                                    ]),
+                                Text(
+                                    money(o['total_centavos'] as int? ??
+                                        ((o['total_pedido'] as num) * 100)
+                                            .round()),
+                                    style: const TextStyle(
+                                        fontSize: 30,
+                                        fontWeight: FontWeight.w800))
+                              ])),
+                          if ((o['observacoes'] as String? ?? '').isNotEmpty)
+                            Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                child: Text(o['observacoes'] as String,
+                                    style: const TextStyle(
+                                        fontSize: 19,
+                                        fontWeight: FontWeight.w600))),
+                          const SizedBox(height: 16),
+                          const Text('Itens e andamento',
+                              style: TextStyle(
+                                  fontSize: 22, fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 12),
+                          for (final i in o['itens'] as List) ...[
+                            SurfaceCard(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Wrap(
+                                      spacing: 20,
+                                      runSpacing: 8,
+                                      alignment: WrapAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                            '${i['quantidade']}× ${i['produto_nome']}',
+                                            style: const TextStyle(
+                                                fontSize: 22,
+                                                fontWeight: FontWeight.w800)),
+                                        Text(
+                                            money(((i['subtotal'] as num) * 100)
+                                                .round()),
+                                            style: const TextStyle(
+                                                fontSize: 21,
+                                                fontWeight: FontWeight.w700))
+                                      ]),
+                                  if ((i['ingredientes'] as List).isNotEmpty)
+                                    Padding(
+                                        padding: const EdgeInsets.only(top: 8),
+                                        child: Text(
+                                            (i['ingredientes'] as List)
+                                                .join(' · '),
+                                            style: const TextStyle(
+                                                color: mutedInk,
+                                                fontSize: 18))),
+                                  for (final extra
+                                      in PastelExtra.parse(i['adicionais']))
+                                    Padding(
+                                        padding: const EdgeInsets.only(top: 8),
+                                        child: Text(
+                                            'Adicional: ${extra.description}',
+                                            style: const TextStyle(
+                                                color: brand, fontSize: 18))),
+                                  if (i['observacoes_item'] != '')
+                                    Padding(
+                                        padding: const EdgeInsets.only(top: 8),
+                                        child: Text(
+                                            'OBS: ${i['observacoes_item']}',
+                                            style: const TextStyle(
+                                                color: brand, fontSize: 17))),
+                                  const SizedBox(height: 14),
+                                  Wrap(spacing: 10, runSpacing: 8, children: [
+                                    StatusPill(
+                                        'Prontos: ${i['quantidade_pronta']}',
+                                        color: success),
+                                    StatusPill(
+                                        'Entregues: ${i['quantidade_entregue']}',
+                                        color: mutedInk),
+                                    if (i['quantidade_cancelada'] > 0)
+                                      StatusPill(
+                                          'Cancelados: ${i['quantidade_cancelada']}',
+                                          color: brand)
+                                  ]),
+                                ])),
+                            const SizedBox(height: 12),
+                          ],
+                        ]),
+          bottomNavigationBar: status != 'aberto'
+              ? null
+              : SafeArea(
+                  top: false,
+                  child: Container(
+                      color: Colors.white,
+                      padding: const EdgeInsets.all(16),
+                      child: Wrap(
+                          spacing: 12,
+                          runSpacing: 10,
+                          alignment: WrapAlignment.end,
+                          children: [
+                            OutlinedButton.icon(
+                                onPressed: _busy ? null : () => _action(true),
+                                icon: const Icon(Icons.cancel_outlined),
+                                label: const Text('Cancelar pedido')),
+                            FilledButton.icon(
+                                onPressed: _busy
+                                    ? null
+                                    : () => Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                    builder: (_) =>
+                                                        const FilaEntregaScreen()))
+                                            .then((_) {
+                                          if (mounted) setState(_load);
+                                        }),
+                                icon: const Icon(Icons.shopping_bag_outlined),
+                                label: const Text('Conferir entrega'))
+                          ]))),
         );
-      },
-    );
-  }
+      });
 }

@@ -1,190 +1,183 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../services/api_service.dart';
-import '../screens/editar_pedido_selecionado.dart';
+import '../ui/app_ui.dart';
+import 'editar_pedido_selecionado.dart';
 
 class EditarPedidosScreen extends StatefulWidget {
-  const EditarPedidosScreen({super.key});
-
+  final ApiService? api;
+  const EditarPedidosScreen({super.key, this.api});
   @override
   State<EditarPedidosScreen> createState() => _EditarPedidosScreenState();
 }
 
 class _EditarPedidosScreenState extends State<EditarPedidosScreen> {
-  final ApiService _apiService = ApiService();
-  late Future<List<dynamic>> _pedidosFuture;
-  String _statusFiltro = 'todos'; // Status inicial do filtro
-
+  late Future<List<dynamic>> _orders;
+  String _filter = 'todos', _search = '';
+  static const _labels = {
+    'todos': 'Todos',
+    'aberto': 'Em atendimento',
+    'fechado': 'Entregues',
+    'cancelado': 'Cancelados'
+  };
   @override
   void initState() {
     super.initState();
-    _fetchPedidos();
+    _load();
   }
 
-  void _fetchPedidos() {
-    setState(() {
-      _pedidosFuture = _apiService.getPedidosHoje();
-    });
-  }
-
-  // Helper para obter a cor do status, seguindo o tema com destaque em âmbar para 'Em Aberto'
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'aberto':
-        return Colors.amber.shade700; // Cor do tema para o status de 'Em Aberto'
-      case 'fechado':
-        return Colors.green.shade700;
-      case 'cancelado':
-        return Colors.red.shade700;
-      default:
-        return Colors.blueGrey;
-    }
-  }
-
-  // Helper para obter o texto formatado do status
-  String _getStatusText(String status) {
-    switch (status) {
-      case 'aberto':
-        return 'Em Aberto';
-      case 'fechado':
-        return 'Finalizado';
-      case 'cancelado':
-        return 'Cancelado';
-      default:
-        return status;
-    }
-  }
-
-  void _aplicarFiltro(String? novoStatus) {
-    if (novoStatus != null) {
-      setState(() {
-        _statusFiltro = novoStatus;
-      });
-    }
+  void _load() {
+    _orders = (widget.api ?? ApiService()).getPedidosHoje();
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pedidos do Dia'),
-        backgroundColor: Colors.deepOrange, // Aplicando o tema ambar/laranja
-        foregroundColor: Colors.white, // Ícones e texto em branco
-        actions: [
-          // Adicionar um botão de recarregar para facilitar os testes
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Pedidos do dia'), actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchPedidos,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Filtro de status
+              tooltip: 'Atualizar pedidos',
+              onPressed: () => setState(_load),
+              icon: const Icon(Icons.refresh)),
+          const SizedBox(width: 12)
+        ]),
+        body: Column(children: [
           Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                const Text('Filtrar por Status:', style: TextStyle(fontWeight: FontWeight.bold)),
-                DropdownButton<String>(
-                  value: _statusFiltro,
-                  items: [
-                    const DropdownMenuItem(value: 'todos', child: Text('Todos')),
-                    DropdownMenuItem(value: 'aberto', child: Text('Em Aberto')),
-                    const DropdownMenuItem(value: 'fechado', child: Text('Finalizado')),
-                    const DropdownMenuItem(value: 'cancelado', child: Text('Cancelado')),
-                  ],
-                  onChanged: _aplicarFiltro,
-                ),
-              ],
-            ),
-          ),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                        onChanged: (s) => setState(() => _search = s),
+                        decoration: const InputDecoration(
+                            hintText:
+                                'Buscar senha ou número interno do pedido',
+                            prefixIcon: Icon(Icons.search))),
+                    const SizedBox(height: 12),
+                    Wrap(
+                        spacing: 10,
+                        runSpacing: 8,
+                        children: _labels.entries
+                            .map((e) => ChoiceChip(
+                                label: Text(e.value),
+                                selected: _filter == e.key,
+                                onSelected: (_) =>
+                                    setState(() => _filter = e.key)))
+                            .toList()),
+                  ])),
           Expanded(
-            child: FutureBuilder<List<dynamic>>(
-              future: _pedidosFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(child: Text('Erro ao carregar pedidos: ${snapshot.error}'));
-                }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(child: Text('Nenhum pedido encontrado hoje.'));
-                }
-                final pedidos = snapshot.data!;
-
-                final pedidosFiltrados = _statusFiltro == 'todos'
-                    ? pedidos
-                    : pedidos.where((pedido) => pedido['status'] == _statusFiltro).toList();
-                
-                if (pedidosFiltrados.isEmpty) {
-                  return Center(child: Text('Nenhum pedido com status "${_getStatusText(_statusFiltro)}" encontrado.'));
-                }
-
-                final formatter = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
-
-                return ListView.builder(
-                  itemCount: pedidosFiltrados.length,
-                  itemBuilder: (context, index) {
-                    final pedido = pedidosFiltrados[index];
-                    final totalPedido = double.tryParse(pedido['total_pedido']?.toString() ?? '0.0') ?? 0.0;
-                    final status = pedido['status']?.toString() ?? 'desconhecido';
-                    
-                    return Card(
-                      elevation: 3,
-                      margin: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          leading: const Icon(Icons.receipt, color: Colors.deepOrange, size: 40), // Aumentado
-                          title: Text(
-                            'Pedido Nº ${pedido['numero_pedido']}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22), // Aumentado
-                          ),
-                          subtitle: Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Text(
-                              'Status: ${_getStatusText(status)}',
-                              style: TextStyle(
-                                color: _getStatusColor(status), // Cor baseada no status
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18, // Aumentado
-                              ),
-                            ),
-                          ),
-                          trailing: Text(
-                            formatter.format(totalPedido),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 22.0, // Aumentado
-                              color: Colors.deepOrange, // Mudado para cor do tema
-                            ),
-                          ),
-                          onTap: () {
-                            // Navegação para a tela de edição
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => EditarPedidoSelecionadoScreen(
-                                  pedidoId: pedido['id'],
-                                ),
-                              ),
-                            ).then((_) => _fetchPedidos()); // Recarrega os pedidos ao voltar
-                          },
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+              child: FutureBuilder<List<dynamic>>(
+                  future: _orders,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState != ConnectionState.done) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Center(
+                          child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                        'Não foi possível carregar os pedidos.',
+                                        style: TextStyle(
+                                            fontSize: 21,
+                                            fontWeight: FontWeight.w700)),
+                                    const SizedBox(height: 12),
+                                    Text('${snapshot.error}',
+                                        textAlign: TextAlign.center),
+                                    const SizedBox(height: 16),
+                                    FilledButton.icon(
+                                        onPressed: () => setState(_load),
+                                        icon: const Icon(Icons.refresh),
+                                        label: const Text('Tentar novamente'))
+                                  ])));
+                    }
+                    final orders = (snapshot.data ?? [])
+                        .reversed
+                        .where((o) =>
+                            (_filter == 'todos' || o['status'] == _filter) &&
+                            (_search.isEmpty ||
+                                '${o['numero_pedido']}'
+                                    .contains(_search.trim()) ||
+                                '${o['pedido_id'] ?? o['id']}'
+                                    .contains(_search.trim())))
+                        .toList();
+                    if (orders.isEmpty) {
+                      return const Center(
+                          child: Text('Nenhum pedido encontrado neste filtro.',
+                              style: TextStyle(fontSize: 21)));
+                    }
+                    return ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                        itemCount: orders.length,
+                        separatorBuilder: (_, index) =>
+                            const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final o = orders[index];
+                          final status = o['status'] as String;
+                          final date = DateTime.tryParse(
+                                  o['data_hora_pedido']?.toString() ?? '')
+                              ?.toLocal();
+                          return Material(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              child: InkWell(
+                                  borderRadius: BorderRadius.circular(16),
+                                  onTap: () async {
+                                    await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                EditarPedidoSelecionadoScreen(
+                                                    pedidoId: (o['pedido_id'] ??
+                                                        o['id']) as int,
+                                                    api: widget.api)));
+                                    if (mounted) setState(_load);
+                                  },
+                                  child: Padding(
+                                      padding: const EdgeInsets.all(18),
+                                      child: Row(children: [
+                                        Expanded(
+                                            child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                              Text(
+                                                  o['numero_pedido'] > 0
+                                                      ? 'Senha ${o['numero_pedido'].toString().padLeft(2, '0')}'
+                                                      : 'Balcão',
+                                                  style: const TextStyle(
+                                                      fontSize: 24,
+                                                      fontWeight:
+                                                          FontWeight.w800)),
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                  'Pedido ${o['pedido_id'] ?? o['id']}${date == null ? '' : ' · ${clockTime(date)}'}',
+                                                  style: const TextStyle(
+                                                      color: mutedInk)),
+                                              const SizedBox(height: 10),
+                                              StatusPill(
+                                                  _labels[status] ?? status,
+                                                  color: status == 'fechado'
+                                                      ? success
+                                                      : status == 'cancelado'
+                                                          ? brand
+                                                          : mutedInk)
+                                            ])),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                            money(o['total_centavos'] as int? ??
+                                                ((o['total_pedido'] as num) *
+                                                        100)
+                                                    .round()),
+                                            style: const TextStyle(
+                                                fontSize: 22,
+                                                fontWeight: FontWeight.w800)),
+                                        const SizedBox(width: 12),
+                                        const Icon(Icons.chevron_right,
+                                            color: mutedInk),
+                                      ]))));
+                        });
+                  })),
+        ]),
+      );
 }

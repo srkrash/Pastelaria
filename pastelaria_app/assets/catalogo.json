@@ -1,0 +1,284 @@
+[
+  {
+    "nome": "Carne",
+    "descricao": "Recheio de carne moída temperada.",
+    "preco_centavos": 0,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Frango",
+    "descricao": "Recheio de frango desfiado com temperos.",
+    "preco_centavos": 0,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Presunto",
+    "descricao": "Fatias de presunto.",
+    "preco_centavos": 0,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Queijo",
+    "descricao": "Queijo mussarela.",
+    "preco_centavos": 0,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Milho",
+    "descricao": "Milho em conserva.",
+    "preco_centavos": 0,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Gueroba",
+    "descricao": "Palmito de gueroba.",
+    "preco_centavos": 0,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Catupiry",
+    "descricao": "Requeijão cremoso Catupiry.",
+    "preco_centavos": 0,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Bacon",
+    "descricao": "Bacon crocante.",
+    "preco_centavos": 0,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Calabresa",
+    "descricao": "Linguiça calabresa fatiada.",
+    "preco_centavos": 0,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Tomate",
+    "descricao": "Fatias de tomate.",
+    "preco_centavos": 0,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Cebola",
+    "descricao": "Cebola picada.",
+    "preco_centavos": 0,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Azeitona",
+    "descricao": "Azeitona verde sem caroço.",
+    "preco_centavos": 0,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Cebolinha",
+    "descricao": "Cebolinha verde",
+    "preco_centavos": 0,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Orégano",
+    "descricao": "Tempero Orégano",
+    "preco_centavos": 0,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Pizza",
+    "descricao": "Pastel de presunto, queijo, tomate e orégano",
+    "preco_centavos": 1500,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Misto",
+    "descricao": "Pastel contendo todos os ingredientes",
+    "preco_centavos": 2500,
+    "tipo": "ingrediente"
+  },
+  {
+    "nome": "Água sem gás 500ml",
+    "descricao": "Água sem gás 500ml",
+    "preco_centavos": 200,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Água com gás 500ml",
+    "descricao": "Água com gás 500ml",
+    "preco_centavos": 200,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Suco Natural 300ml",
+    "descricao": "Suco Natural 300ml",
+    "preco_centavos": 300,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Suco Natural 500ml",
+    "descricao": "Suco Natural 500ml",
+    "preco_centavos": 500,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Coca-Cola Lata",
+    "descricao": "Lata de Coca-Cola 350ml.",
+    "preco_centavos": 600,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Coca-Cola Zero Lata",
+    "descricao": "Lata de Coca-Cola Zero 350ml.",
+    "preco_centavos": 600,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Guarana Mineiro Lata",
+    "descricao": "Lata de Guarana Mineiro 350ml.",
+    "preco_centavos": 600,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Fanta Laranja Lata",
+    "descricao": "Lata de Fanta Laranja 350ml.",
+    "preco_centavos": 500,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Sprite Lata",
+    "descricao": "Lata de Sprite 350ml.",
+    "preco_centavos": 500,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Amstel Lata",
+    "descricao": "Lata de Amstel 269ml.",
+    "preco_centavos": 500,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Skol Lata",
+    "descricao": "Lata de Skol 269ml.",
+    "preco_centavos": 500,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Brahma Lata",
+    "descricao": "Lata de Brahma 269ml.",
+    "preco_centavos": 500,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Antarctica Lata",
+    "descricao": "Lata de Antarctica 269ml.",
+    "preco_centavos": 500,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Heineken Lata",
+    "descricao": "Lata de Heineken 269ml.",
+    "preco_centavos": 500,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Coca-cola 600ml",
+    "descricao": "Pet de Coca-Cola 600ml.",
+    "preco_centavos": 800,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Mineiro 600ml",
+    "descricao": "Pet de Mineiro 600ml.",
+    "preco_centavos": 700,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Coca-cola 1L",
+    "descricao": "Pet de Coca-Cola 1L.",
+    "preco_centavos": 1000,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Coca-cola zero 1L",
+    "descricao": "Pet de Coca-Cola Zero 1L.",
+    "preco_centavos": 1000,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Fanta 1L",
+    "descricao": "Pet de Fanta 1L.",
+    "preco_centavos": 1000,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Coca-cola 2L",
+    "descricao": "Pet de Coca-Cola 2L.",
+    "preco_centavos": 1300,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Mineiro 2L",
+    "descricao": "Pet de Mineiro 2L.",
+    "preco_centavos": 1100,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Fanta 2L",
+    "descricao": "Pet de Fanta 2L.",
+    "preco_centavos": 1100,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Energético Extra Power 473ml",
+    "descricao": "Lata de Energético Extra Power 473ml.",
+    "preco_centavos": 1000,
+    "tipo": "bebida"
+  },
+  {
+    "nome": "Pastel",
+    "descricao": "Pastel",
+    "preco_centavos": 0,
+    "tipo": "pastel"
+  },
+  {
+    "nome": "Disco",
+    "descricao": "Disco de carne frito",
+    "preco_centavos": 1200,
+    "tipo": "salgado"
+  },
+  {
+    "nome": "Coxinha",
+    "descricao": "Coxinha de frango e catupiry",
+    "preco_centavos": 1200,
+    "tipo": "salgado"
+  },
+  {
+    "nome": "Pastelão",
+    "descricao": "Pastelão de carne, queijo e milho",
+    "preco_centavos": 1200,
+    "tipo": "salgado"
+  },
+  {
+    "nome": "Enroladinho Salsicha",
+    "descricao": "Enroladinho de salsicha e queijo",
+    "preco_centavos": 1200,
+    "tipo": "salgado"
+  },
+  {
+    "nome": "Enroladinho Presunto",
+    "descricao": "Enroladinho de presunto e queijo",
+    "preco_centavos": 1200,
+    "tipo": "salgado"
+  },
+  {
+    "nome": "Assado Frango",
+    "descricao": "Torta assada de frango, presunto e queijo",
+    "preco_centavos": 1200,
+    "tipo": "salgado"
+  },
+  {
+    "nome": "Assado Presunto",
+    "descricao": "Torta assada de presunto, queijo e tomate",
+    "preco_centavos": 1200,
+    "tipo": "salgado"
+  }
+]

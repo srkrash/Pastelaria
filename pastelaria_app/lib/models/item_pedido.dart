@@ -1,8 +1,8 @@
-// lib/models/item_pedido.dart
+import 'pastel_extra.dart';
 
 class ItemPedido {
   int id;
-  int pedidoId; 
+  int pedidoId;
   int numeroPedido; // Novo campo para o número do pedido
   int quantidade;
   String produtoNome;
@@ -10,6 +10,7 @@ class ItemPedido {
   double preco;
   List<String> ingredientes;
   String observacoesItem;
+  final List<PastelExtra> adicionais;
 
   ItemPedido({
     required this.id,
@@ -21,7 +22,8 @@ class ItemPedido {
     required this.preco,
     required this.ingredientes,
     required this.observacoesItem,
-  });
+    List<PastelExtra> adicionais = const [],
+  }) : adicionais = List.unmodifiable(adicionais);
 
   factory ItemPedido.fromJson(Map<String, dynamic> json) {
     // CORREÇÃO: Trata o 'preco' de forma segura
@@ -35,13 +37,15 @@ class ItemPedido {
     } else {
       parsedPreco = 0.0; // Caso seja null ou outro tipo
     }
-    
+
     // CORREÇÃO: Lida com a possibilidade de 'id' e 'quantidade' serem nulos ou outros tipos.
     final int id = (json['item_id'] as num? ?? 0).toInt();
-    final int pedidoId = (json['pedido_id'] as num? ?? 0).toInt(); // Lê o pedido_id
-    final int numeroPedido = (json['numero_pedido'] as num? ?? 0).toInt(); // Lê o numero_pedido
+    final int pedidoId =
+        (json['pedido_id'] as num? ?? 0).toInt(); // Lê o pedido_id
+    final int numeroPedido =
+        (json['numero_pedido'] as num? ?? 0).toInt(); // Lê o numero_pedido
     final int quantidade = (json['quantidade'] as num? ?? 0).toInt();
-    
+
     // Converte a lista de ingredientes, se existir
     List<String> ingredientesList;
     if (json['ingredientes'] != null && json['ingredientes'] is List) {
@@ -60,6 +64,7 @@ class ItemPedido {
       preco: parsedPreco,
       ingredientes: ingredientesList,
       observacoesItem: json['observacoes_item'] ?? '',
+      adicionais: PastelExtra.parse(json['adicionais']),
     );
   }
 
@@ -73,6 +78,7 @@ class ItemPedido {
       'preco': preco,
       'ingredientes': ingredientes,
       'observacoesItem': observacoesItem,
+      'adicionais': adicionais.map((extra) => extra.toJson()).toList(),
     };
   }
 }
