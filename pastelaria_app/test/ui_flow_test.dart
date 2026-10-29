@@ -336,36 +336,52 @@ void main() {
         size: const Size(600, 960), scale: 1.3);
     expect(tester.takeException(), isNull);
   });
-  testWidgets('confirmação envia tipo e observações selecionados na comanda',
-      (tester) async {
-    final api = UiApi();
-    final p = PedidosProvider(api: api);
-    p.adicionarItem(draftItem());
-    addTearDown(p.dispose);
-    await mount(
-        tester,
-        Builder(
-            builder: (context) => Scaffold(
-                body: TextButton(
-                    onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => NovoPedidoScreen(api: api))),
-                    child: const Text('Abrir comanda')))),
-        p);
-    await tester.tap(find.text('Abrir comanda'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Viagem'));
-    await tester.enterText(find.byType(TextField), 'Separar bebidas');
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Confirmar pedido'));
-    await tester.pumpAndSettle();
-    expect(api.sent!['observacoes_pedido'], '[Viagem] Separar bebidas');
-    expect((api.sent!['itens'] as List).single['quantidade'], 2);
-    expect(p.itensPedidoAtual, isEmpty);
-    expect(p.ultimoPedidoConfirmado!['numero'], 14);
-    expect(tester.takeException(), isNull);
-  });
+  for (final type in ['Consumo', 'Viagem']) {
+    testWidgets(
+        'confirmação pede $type no popup e preserva a comanda ao voltar',
+        (tester) async {
+      final api = UiApi();
+      final p = PedidosProvider(api: api);
+      p.adicionarItem(draftItem());
+      addTearDown(p.dispose);
+      await mount(
+          tester,
+          Builder(
+              builder: (context) => Scaffold(
+                  body: TextButton(
+                      onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => NovoPedidoScreen(api: api))),
+                      child: const Text('Abrir comanda')))),
+          p);
+      await tester.tap(find.text('Abrir comanda'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SegmentedButton<String>), findsNothing);
+      expect(find.text('Como vai ser servido?'), findsNothing);
+      await tester.enterText(find.byType(TextField), 'Separar bebidas');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar pedido'));
+      await tester.pumpAndSettle();
+      expect(find.text('Como vai ser servido?'), findsOneWidget);
+      expect(api.sent, isNull);
+      await tester.tap(find.text('Voltar'));
+      await tester.pumpAndSettle();
+      expect(api.sent, isNull);
+      expect(p.itensPedidoAtual, hasLength(1));
+      expect(p.draftNotes, 'Separar bebidas');
+      await tester.tap(find.text('Confirmar pedido'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+          find.text(type == 'Consumo' ? 'Consumo no local' : 'Para viagem'));
+      await tester.pumpAndSettle();
+      expect(api.sent!['observacoes_pedido'], '[$type] Separar bebidas');
+      expect((api.sent!['itens'] as List).single['quantidade'], 2);
+      expect(p.itensPedidoAtual, isEmpty);
+      expect(p.ultimoPedidoConfirmado!['numero'], 14);
+      expect(tester.takeException(), isNull);
+    });
+  }
   testWidgets('cancelamento exige confirmação e Voltar não altera pedido',
       (tester) async {
     final api = UiApi();

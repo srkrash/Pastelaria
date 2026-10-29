@@ -358,6 +358,9 @@ class _OrderQueueScreenState extends State<OrderQueueScreen> {
                               .toLocal();
                       return SurfaceCard(
                           key: ValueKey(p['pedido_id']),
+                          color: !widget.production && trip
+                              ? const Color(0xFFE3F2FD)
+                              : Colors.white,
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [

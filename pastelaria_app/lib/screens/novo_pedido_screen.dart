@@ -21,6 +21,7 @@ class NovoPedidoScreen extends StatefulWidget {
 class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
   final _notes = TextEditingController();
   bool _busy = false;
+  bool _choosingType = false;
   String? _fingerprint;
   String _commandId = newCommandId();
   Map<String, dynamic>? _catalog;
@@ -163,6 +164,39 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
       }
       return;
     }
+    setState(() => _choosingType = true);
+    final type = await showDialog<String>(
+        context: context,
+        builder: (c) => AlertDialog(
+              title: const Text('Como vai ser servido?'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton.icon(
+                      onPressed: () => Navigator.pop(c, 'Consumo'),
+                      icon: const Icon(Icons.restaurant_outlined),
+                      label: const Text('Consumo no local')),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                      onPressed: () => Navigator.pop(c, 'Viagem'),
+                      icon: const Icon(Icons.takeout_dining_outlined),
+                      label: const Text('Para viagem')),
+                ],
+              ),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(c),
+                    child: const Text('Voltar')),
+              ],
+            ));
+    if (!mounted) return;
+    setState(() => _choosingType = false);
+    if (type == null) {
+      setState(() => _busy = false);
+      return;
+    }
+    p.draftType = type;
     final payload = <String, dynamic>{
       'observacoes_pedido': '[${p.draftType}] ${_notes.text.trim()}',
       'itens': p.itensPedidoAtual
@@ -229,28 +263,6 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
             onPressed: () => _addProduct('bebida'),
             icon: const Icon(Icons.local_drink_outlined),
             label: const Text('Bebidas')),
-      ]);
-  Widget _type(PedidosProvider p) =>
-      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const Text('Como vai ser servido?',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 10),
-        SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(
-                  value: 'Consumo',
-                  label: Text('No local'),
-                  icon: Icon(Icons.restaurant_outlined)),
-              ButtonSegment(
-                  value: 'Viagem',
-                  label: Text('Viagem'),
-                  icon: Icon(Icons.takeout_dining_outlined))
-            ],
-            selected: {
-              p.draftType
-            },
-            showSelectedIcon: false,
-            onSelectionChanged: (s) => setState(() => p.draftType = s.single)),
       ]);
   Widget _observations(PedidosProvider p) => TextField(
       controller: _notes,
@@ -432,8 +444,6 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                                                         EdgeInsets.symmetric(
                                                             vertical: 16),
                                                     child: Divider()),
-                                                _type(p),
-                                                const SizedBox(height: 24),
                                                 _observations(p)
                                               ]))))
                                     ])
@@ -460,8 +470,6 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                                                 Icons.local_drink_outlined),
                                             label: const Text('Bebidas'))
                                       ])),
-                                  const SizedBox(height: 16),
-                                  _type(p),
                                   const SizedBox(height: 18),
                                   Expanded(child: _comanda(p, false)),
                                 ]));
@@ -493,14 +501,16 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                     FilledButton.icon(
                         onPressed:
                             units > 0 && !_busy ? () => _confirm(p) : null,
-                        icon: _busy
+                        icon: _busy && !_choosingType
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
                                 child:
                                     CircularProgressIndicator(strokeWidth: 2))
                             : const Icon(Icons.check),
-                        label: Text(_busy ? 'Enviando…' : 'Confirmar pedido'))
+                        label: Text(_busy && !_choosingType
+                            ? 'Enviando…'
+                            : 'Confirmar pedido'))
                   ]))),
         ));
   }

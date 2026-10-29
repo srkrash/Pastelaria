@@ -44,6 +44,10 @@ O papel de interface não deve ficar preso ao IP do equipamento. É necessário 
 
 ### REQ-01 — Montagem do pedido
 
+**Confirmado em 29/10/2026:** retirar a seleção de consumo/viagem da montagem
+do pedido. Ao confirmar, abrir um popup com “Consumo no local” e “Para viagem”;
+a escolha finaliza o envio. Voltar ou fechar o popup preserva a comanda sem enviar.
+
 **Confirmado em 28/10/2026:** incluir botão “Recheio adicional” na montagem do
 pastel, com nome livre e valor por pastel. O valor inicial do campo é o adicional
 já configurado no cadastro; o atendente pode ajustá-lo nessa montagem. Multiplicar
@@ -107,6 +111,10 @@ Critério de aceite: um pedido com sabores distintos e observações deve ser co
 ## 5. Entrega
 
 ### REQ-04 — Fila compartilhada e confiável
+
+**Confirmado em 29/10/2026:** na tela de entregas, os cartões dos pedidos para
+viagem têm fundo azul-claro para identificação imediata; pedidos para consumo
+no local mantêm o fundo branco. Preservar os rótulos “Viagem” e “No local”.
 
 **Confirmado em 28/10/2026:** incluir “Entregar tudo” à direita da senha no
 cabeçalho do pedido. Habilitar somente quando todos os pastéis estiverem prontos.

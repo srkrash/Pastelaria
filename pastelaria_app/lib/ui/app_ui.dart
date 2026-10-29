@@ -74,15 +74,17 @@ int itemUnitCents(ItemPedido item) => item.produtoNome == 'Pastel'
 class SurfaceCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
+  final Color color;
   const SurfaceCard(
       {super.key,
       required this.child,
+      this.color = Colors.white,
       this.padding = const EdgeInsets.all(20)});
   @override
   Widget build(BuildContext context) => Container(
         padding: padding,
         decoration: BoxDecoration(
-            color: Colors.white,
+            color: color,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: const Color(0xFFE0E5DF))),
         child: child,
